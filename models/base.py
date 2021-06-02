@@ -4,6 +4,7 @@ import time
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from pathlib import Path
+import gc
 
 import torch
 import numpy as np
@@ -206,9 +207,13 @@ class BaseTrainer(ABC):
 
                 loss.backward()
                 self.optimizer.step()
+                del loss, input_
 
         pred, target = self.postprocess(pred, target)
         self.tracker.step({**metrics, **self.evaluate(pred, target)})
+        del pred, target
+        gc.collect()
+        torch.cuda.empty_cache()
 
     def train_one_epoch(self, no_val=False):
         """Hook for training one epoch.
