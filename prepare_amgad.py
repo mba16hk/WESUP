@@ -70,16 +70,7 @@ def prepare_images(orig_path, dst_path, paths):
         dst_img_path = j(dst_img_dir, img_name)
         orig_mask_path = j(mask_path, img_name)
         dst_mask_path = j(dst_mask_dir, img_name)
-
-        #img_name = '{}.png'.format(name) #images are those that end with .png
-        #mask_name = 'anno_{}.png'.format(name)#anontations are those tat start with anno_
-
-
-        #orig_img_path = j(orig_path, img_name)
-        #dst_img_path = j(dst_img_dir, img_name)
-        #orig_mask_path = j(orig_path, mask_name)
-        #dst_mask_path = j(dst_mask_dir, img_name)
-
+        print(path)
         # copy original image to destination
         copyfile(orig_img_path, dst_img_path)
 
@@ -93,14 +84,6 @@ def prepare_images(orig_path, dst_path, paths):
 if __name__ == '__main__':
     parser = build_cli_parser()
     args = parser.parse_args()
-    
-    #rename files in the masks directory
-    #path="/nfs/st01/hpc-cmih-cbs31/hk502/datasets/Amgad/masks/"
-    #for filename in os.listdir(path):
-    #    dst = "anno_" +filename
-    #    src =path+ filename
-    #    dst =path+ dst
-     #   os.rename(src, dst) 
     
     #split the training and testing data
     train_set, val_set = split_train_val_test(
@@ -121,6 +104,3 @@ if __name__ == '__main__':
 
     prepare_images(args.dataset_path, val_dir, val_set)
     print('Validation data is done.')
-
-    #prepare_images(args.dataset_path, test_dir, test_set)
-    #print('Test data is done.')
