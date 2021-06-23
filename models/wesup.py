@@ -26,11 +26,10 @@ def _preprocess_superpixels(segments, mask=None, epsilon=1e-7):
         sp_maps: superpixel maps with shape (N, H, W)
         sp_labels: superpixel labels with shape (N_l, C), where N_l is the number of labeled samples.
     """
-
     # ordering of superpixels
     sp_idx_list = segments.unique()
-
-    if mask is not None and not is_empty_tensor(mask):
+    #print(sp_idx_list)
+    if mask is not None and not is_empty_tensor(mask) :#and (torch.max(mask)>0):
         def compute_superpixel_label(sp_idx):
             sp_mask = (mask * (segments == sp_idx).long()).float()
             return sp_mask.sum(dim=(1, 2)) / (sp_mask.sum() + epsilon)
@@ -45,9 +44,10 @@ def _preprocess_superpixels(segments, mask=None, epsilon=1e-7):
         labeled_sps = (sp_labels.sum(dim=-1) > 0).nonzero().flatten()
         unlabeled_sps = (sp_labels.sum(dim=-1) == 0).nonzero().flatten()
         sp_idx_list = torch.cat([labeled_sps, unlabeled_sps])
-
+       
         # quantize superpixel labels (e.g., from (0.7, 0.3) to (1.0, 0.0))
         sp_labels = sp_labels[labeled_sps]
+        #print(sp_labels.max())
         sp_labels = (sp_labels == sp_labels.max(
             dim=-1, keepdim=True)[0]).float()
     else:  # no supervision provided
@@ -76,7 +76,7 @@ def _cross_entropy(y_hat, y_true, class_weights=None, epsilon=1e-7):
     Returns:
         cross_entropy: cross entropy loss computed only on samples with labels
     """
-
+    #print("y_true", y_true)
     device = y_hat.device
 
     # clamp all elements to prevent numerical overflow/underflow
@@ -88,10 +88,16 @@ def _cross_entropy(y_hat, y_true, class_weights=None, epsilon=1e-7):
     if labeled_samples.item() == 0:
         return torch.tensor(0.).to(device)
 
+    #print("y_true", y_true.shape)
+    #print("y_hat", y_hat.shape)
     ce = -y_true * torch.log(y_hat)
+    print("wesup, ce:", ce.shape)
 
     if class_weights is not None:
-        ce = ce * class_weights.unsqueeze(0).float()
+        #print("CW:", class_weights)
+        ce = ce * class_weights[...,None]
+        #ce = ce * class_weights.unsqueeze(0).float()
+        
 
     return torch.sum(ce) / labeled_samples
 
@@ -152,7 +158,8 @@ class WESUPConfig(BaseConfig):
     n_classes = 2
 
     # Class weights for cross-entropy loss function.
-    class_weights = (3, 1)
+    class_weights=(3, 1)
+    #class_weights = torch.rand(n_classes,1,device="cuda" if torch.cuda.is_available() else "cpu") #, device="cuda"
 
     # Superpixel parameters.
     sp_area = 200
@@ -227,7 +234,7 @@ class WESUP(nn.Module):
         #     nn.Softmax(dim=1)
         # )
         self.classifier = nn.Sequential(
-            nn.Linear(D, self.kwargs.get('n_classes', 2)),
+            nn.Linear(D, self.kwargs.get('n_classes', n_classes)),
             nn.Softmax(dim=1)
         )
 
@@ -322,7 +329,7 @@ class WESUPPixelInference(WESUP):
 
         self.kwargs = kwargs
         self.backbone = models.vgg16(pretrained=True).features
-
+        
         # sum of channels of all feature maps
         self.fm_channels_sum = 0
 
@@ -352,10 +359,10 @@ class WESUPPixelInference(WESUP):
         #     nn.Softmax(dim=1)
         # )
         self.classifier = nn.Sequential(
-            nn.Linear(D, self.kwargs.get('n_classes', 2)),
+            nn.Linear(D, self.kwargs.get('n_classes', n_classes)),
             nn.Softmax(dim=1)
         )
-
+        
         # store conv feature maps
         self.feature_maps = None
 
@@ -455,12 +462,19 @@ class WESUPTrainer(BaseTrainer):
         return optimizer, None
 
     def preprocess(self, *data):
+        #print(data)
         data = [datum.to(self.device) for datum in data]
+        #print(len(data))
         if len(data) == 3:
             img, pixel_mask, point_mask = data
         elif len(data) == 2:
             img, pixel_mask = data
             point_mask = empty_tensor()
+            #print("image:",img.shape)
+            #print("pixel_mask:", pixel_mask.shape)
+            #print("point_mask:", point_mask.shape)
+            #if torch.max(pixel_mask)==0:
+            #    pixel_mask=None
         elif len(data) == 1:
             img, = data
             point_mask = empty_tensor()
@@ -477,23 +491,32 @@ class WESUPTrainer(BaseTrainer):
         segments = torch.as_tensor(
             segments, dtype=torch.long, device=self.device)
 
+        #print("pixel mask max:", torch.max(pixel_mask))
         if point_mask is not None and not is_empty_tensor(point_mask):
             mask = point_mask.squeeze()
+            #print("1")
         elif pixel_mask is not None and not is_empty_tensor(pixel_mask):
             mask = pixel_mask.squeeze()
+            #print("2")
         else:
             mask = None
-
+            #print("3")
+        #print("mask shape:", mask.shape)
         sp_maps, sp_labels = _preprocess_superpixels(
             segments, mask, epsilon=self.kwargs.get('epsilon'))
 
         return (img, sp_maps), (pixel_mask, sp_labels)
 
     def compute_loss(self, pred, target, metrics=None):
+        #print(target)
         _, sp_labels = target
+        #print(sp_labels)
+        #print(sp_labels.shape)
 
         sp_features = self.model.sp_features
         sp_pred = self.model.sp_pred
+        #print("sp_pred", sp_pred.shape)
+        #print("sp_lab", sp_labels.shape)
 
         if sp_pred is None:
             raise RuntimeError(
@@ -501,9 +524,11 @@ class WESUPTrainer(BaseTrainer):
 
         # total number of superpixels
         total_num = sp_pred.size(0)
+        #print(total_num)
 
         # number of labeled superpixels
-        labeled_num = sp_labels.size(0)
+        labeled_num = sp_labels.size(0) #number of rows
+        #print(labeled_num)
 
         if labeled_num < total_num:
             # weakly-supervised mode
@@ -524,6 +549,7 @@ class WESUPTrainer(BaseTrainer):
                     metrics['propagate_loss'] = propagate_loss.item()
         else:  # fully-supervised mode
             loss = self.xentropy(sp_pred, sp_labels)
+            #print("supervised")
 
         # clear outdated superpixel prediction
         self.model.sp_pred = None
