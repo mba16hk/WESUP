@@ -1,11 +1,11 @@
 """
 Data loading utilities.
 """
-
 import csv
 from functools import partial
 from pathlib import Path
 
+import os
 import cv2
 import numpy as np
 import pandas as pd
@@ -18,6 +18,12 @@ from skimage.transform import resize
 import torch
 from torch.utils.data import Dataset
 import torchvision.transforms.functional as TF
+import train
+
+parser = train.build_cli_parser()
+args = parser.parse_args()
+n= args.n_classes
+print('classes',n)
 
 empty_tensor = torch.tensor(0)
 
@@ -30,6 +36,7 @@ def resize_img(img, target_size):
     return (img * 255).astype('uint8')
 
 
+
 class SegmentationDataset(Dataset):
     """Dataset for segmentation task.
 
@@ -39,8 +46,8 @@ class SegmentationDataset(Dataset):
         - cont (optional): tensor of size (C, H, W) with type long, only when `contour` is `True`
     """
 
-    def __init__(self, root_dir, mode=None, contour=False, target_size=None, rescale_factor=None,
-                 multiscale_range=None, train=True, proportion=1, n_classes=2, seed=0):
+    def __init__(self, root_dir, n_classes=n ,mode=None, contour=False, target_size=None, rescale_factor=None,
+                 multiscale_range=None, train=True, proportion=1, seed=0):
         """Initialize a new SegmentationDataset.
 
         Args:
@@ -55,16 +62,18 @@ class SegmentationDataset(Dataset):
             n_classes: number of target classes
             seed: random seed
         """
-
+        
         self.root_dir = Path(root_dir).expanduser()
 
         # path to original images
         self.img_paths = sorted((self.root_dir / 'images').iterdir())
+        #print(self.img_paths)
 
         # path to mask annotations (optional)
         self.mask_paths = None
         if (self.root_dir / 'masks').exists():
             self.mask_paths = sorted((self.root_dir / 'masks').iterdir())
+        #print(self.mask_paths)
 
         self.mode = mode or 'mask' if self.mask_paths is not None else None
 
@@ -133,6 +142,7 @@ class SegmentationDataset(Dataset):
         return augmented['image'], augmented.get('mask', None)
 
     def _convert_image_and_mask_to_tensor(self, img, mask):
+        #print(img.shape)
         img = TF.to_tensor(img)
         if mask is not None:
             if self.contour:
@@ -148,7 +158,7 @@ class SegmentationDataset(Dataset):
                                    for i in range(self.n_classes)])
             cont = torch.as_tensor(cont.astype('int64'), dtype=torch.long)
             return img, mask, cont
-
+        #print(mask.shape, img.shape)
         return img, mask
 
     def __getitem__(self, idx):
@@ -157,6 +167,7 @@ class SegmentationDataset(Dataset):
         mask = None
         if self.mask_paths is not None:
             mask = imread(str(self.mask_paths[idx]))
+            #mask[mask>1]=1
         img, mask = self._resize_image_and_mask(img, mask)
 
         if self.train:
@@ -213,6 +224,7 @@ class AreaConstraintDataset(SegmentationDataset):
         Returns:
             dataset: a new AreaConstraintDataset instance
         """
+        #self.n_classes=n_classes
         super().__init__(root_dir, mode='area', target_size=target_size,
                          rescale_factor=rescale_factor, train=train, proportion=proportion)
 
@@ -223,6 +235,7 @@ class AreaConstraintDataset(SegmentationDataset):
         self.area_type = area_type
         self.constraint = constraint
         self.margin = margin
+        
 
     def _augment(self, *data):
         img, mask = data
