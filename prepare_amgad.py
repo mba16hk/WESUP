@@ -44,8 +44,11 @@ def split_train_val_test(orig_path, val_size=0.1):
     #splits the trains and val sets such that they dont overlap
     train_set, val_set, _, _ = train_test_split(
         trains, y, test_size=val_size)
+    
+    tests = val_set
+    tests.extend(train_set[0:round(len(train_set)*val_size)])
 
-    return train_set, val_set #returns these datasets
+    return train_set, val_set, tests #returns these datasets
 
 #dst_path is the path to the destination, names are the names of the files
 def prepare_images(orig_path, dst_path, paths):
@@ -86,7 +89,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     #split the training and testing data
-    train_set, val_set = split_train_val_test(
+    train_set, val_set, test_set = split_train_val_test(
         args.dataset_path, args.val_size)
     
     #if a directory for the output doesnt exist, make one instead
@@ -97,10 +100,14 @@ if __name__ == '__main__':
     train_dir = j(args.output, 'train')
     #The validation directory will be located in that joint path
     val_dir = j(args.output, 'val')
-    #test_dir = j(args.output, 'test')
+    #The test directory will be located in that joint path
+    test_dir = j(args.output, 'test')
 
     prepare_images(args.dataset_path, train_dir, train_set)
     print('Training data is done.')
 
     prepare_images(args.dataset_path, val_dir, val_set)
     print('Validation data is done.')
+
+    prepare_images(args.dataset_path, test_dir, test_set)
+    print('Test data is done.')
