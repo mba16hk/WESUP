@@ -6,9 +6,6 @@ import logging
 from shutil import rmtree
 
 import fire
-
-#from models import initialize_trainer
-import models
 from utils.metrics import accuracy
 from utils.metrics import dice
 import argparse
@@ -23,6 +20,8 @@ def build_cli_parser():
     parser.add_argument('-N', '--n_classes', default=2, type=int, help='Number of object classes')
     parser.add_argument('-p', '--proportion', default=1, type=float, help='Proportion of images to be trained on.')
     parser.add_argument('-b', '--batch', default=1, type=int, help='Batch size for training at each epoch.')
+    parser.add_argument('-k', '--checkpoint', default=None, help='Path to checkpoint.')
+    parser.add_argument('-o', '--output', help='Path to output directory')
     return parser
 
 def read_class_weights(weights_file):
