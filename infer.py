@@ -10,16 +10,24 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-import fire
+#import fire
+import argparse
 from tqdm import tqdm
 from PIL import Image
 from skimage.morphology import opening
 
+import train
 from models import initialize_trainer
 from utils.data import SegmentationDataset
 
-warnings.filterwarnings('ignore')
+""" 
+For this module pass the following arguments:
 
+-k or --checkpoint, for the path to the checkpoint you want to test at
+-o or --output, for the the path to save the predictions in
+
+These are inherited from the train.py file in the build_cli_parser function
+"""
 
 def predict_single_image(trainer, img, mask, output_size):
     input_, target = trainer.preprocess(img, mask.long())
@@ -134,6 +142,7 @@ def infer(trainer, data_dir, output_dir=None, input_size=None,
 
 def main(data_dir, model_type='wesup', checkpoint=None, output_dir=None,
          input_size=None, scales=(0.5,), num_workers=4, device=None):
+    print(output_dir)
     if output_dir is None and checkpoint is not None:
         checkpoint = Path(checkpoint)
         output_dir = checkpoint.parent.parent / 'results'
@@ -150,4 +159,8 @@ def main(data_dir, model_type='wesup', checkpoint=None, output_dir=None,
 
 
 if __name__ == '__main__':
-    fire.Fire(main)
+    parser = train.build_cli_parser()
+    args = parser.parse_args()
+
+    main(data_dir=args.dataset_path, model_type='wesup', checkpoint=args.checkpoint, output_dir=args.output,
+         input_size=None, scales=(0.5,), num_workers=4, device=None)
