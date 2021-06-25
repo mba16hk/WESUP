@@ -45,9 +45,10 @@ def split_train_val_test(orig_path, val_size=0.1):
     train_set, val_set, _, _ = train_test_split(
         trains, y, test_size=val_size)
     
-    tests = val_set
-    tests.extend(train_set[0:round(len(train_set)*val_size)])
-
+    tests = []
+    tests.extend(val_set)
+    tests.extend(train_set[0:round(len(train_set)*0.1)])
+    print("tests:", len(tests), "trains:", len(train_set), "vals:", len(val_set))
     return train_set, val_set, tests #returns these datasets
 
 #dst_path is the path to the destination, names are the names of the files
@@ -73,16 +74,12 @@ def prepare_images(orig_path, dst_path, paths):
         dst_img_path = j(dst_img_dir, img_name)
         orig_mask_path = j(mask_path, img_name)
         dst_mask_path = j(dst_mask_dir, img_name)
-        print(path)
+
         # copy original image to destination
         copyfile(orig_img_path, dst_img_path)
 
         # save binarized mask to destination
         copyfile(orig_mask_path, dst_mask_path)
-        #imsave(dst_mask_path, (imread(orig_mask_path) > 0).astype('uint8'))
-
-
-
 
 if __name__ == '__main__':
     parser = build_cli_parser()
