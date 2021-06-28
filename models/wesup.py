@@ -88,17 +88,13 @@ def _cross_entropy(y_hat, y_true, class_weights=None, epsilon=1e-7):
     if labeled_samples.item() == 0:
         return torch.tensor(0.).to(device)
 
-    #print("y_true", y_true.shape)
-    #print("y_hat", y_hat.shape)
     ce = -y_true * torch.log(y_hat)
-    print("wesup, ce:", ce.shape)
+    #print("wesup, ce:", ce.shape)
 
     if class_weights is not None:
-        #print("CW:", class_weights)
         ce = ce * class_weights[...,None]
         #ce = ce * class_weights.unsqueeze(0).float()
         
-
     return torch.sum(ce) / labeled_samples
 
 
@@ -462,26 +458,26 @@ class WESUPTrainer(BaseTrainer):
         return optimizer, None
 
     def preprocess(self, *data):
-        #print(data)
         data = [datum.to(self.device) for datum in data]
         #print(len(data))
         if len(data) == 3:
             img, pixel_mask, point_mask = data
+            #print("data3")
         elif len(data) == 2:
             img, pixel_mask = data
             point_mask = empty_tensor()
-            #print("image:",img.shape)
-            #print("pixel_mask:", pixel_mask.shape)
-            #print("point_mask:", point_mask.shape)
-            #if torch.max(pixel_mask)==0:
-            #    pixel_mask=None
+            #print("data2")
         elif len(data) == 1:
             img, = data
             point_mask = empty_tensor()
             pixel_mask = empty_tensor()
+            #print("data1")
         else:
             raise ValueError('Invalid input data for WESUP')
 
+        print("image shape:",img.shape)
+        # if img.shape[0]>1:
+        #     for i in range(0,img.shape[0]):
         segments = slic(
             img.squeeze().cpu().numpy().transpose(1, 2, 0),
             n_segments=int(img.size(-2) * img.size(-1) /
@@ -491,16 +487,12 @@ class WESUPTrainer(BaseTrainer):
         segments = torch.as_tensor(
             segments, dtype=torch.long, device=self.device)
 
-        #print("pixel mask max:", torch.max(pixel_mask))
         if point_mask is not None and not is_empty_tensor(point_mask):
             mask = point_mask.squeeze()
-            #print("1")
         elif pixel_mask is not None and not is_empty_tensor(pixel_mask):
             mask = pixel_mask.squeeze()
-            #print("2")
         else:
             mask = None
-            #print("3")
         #print("mask shape:", mask.shape)
         sp_maps, sp_labels = _preprocess_superpixels(
             segments, mask, epsilon=self.kwargs.get('epsilon'))
@@ -508,7 +500,6 @@ class WESUPTrainer(BaseTrainer):
         return (img, sp_maps), (pixel_mask, sp_labels)
 
     def compute_loss(self, pred, target, metrics=None):
-        #print(target)
         _, sp_labels = target
         #print(sp_labels)
         #print(sp_labels.shape)

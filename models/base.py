@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from pathlib import Path
 import gc
+import train
 
 import torch
 import numpy as np
@@ -12,6 +13,10 @@ from tqdm import tqdm
 
 from utils import underline, record
 from utils.history import HistoryTracker
+
+parser = train.build_cli_parser()
+args = parser.parse_args()
+checkpoint_path=args.checkpoint
 
 
 class BaseConfig:
@@ -122,13 +127,12 @@ class BaseTrainer(ABC):
             loss: model loss
         """
 
-    def load_checkpoint(self, ckpt_path=None):
+    def load_checkpoint(self, ckpt_path=checkpoint_path):
         """Load checkpointed model weights, optimizer states, etc, from given path.
 
         Args:
             ckpt_path: path to checkpoint
         """
-
         if ckpt_path is not None:
             self.record_dir = Path(ckpt_path).parent.parent
             self.logger.info(f'Loading checkpoint from {ckpt_path}.')
@@ -191,6 +195,8 @@ class BaseTrainer(ABC):
         """
 
         input_, target = self.preprocess(*data)
+        #print("input_ shape", input_.shape)
+        #print("target shape", target.shape)
 
         self.optimizer.zero_grad()
         metrics = dict()
