@@ -23,10 +23,15 @@ import train
 parser = train.build_cli_parser()
 args = parser.parse_args()
 n= args.n_classes
+rsc_factor=args.rescale_factor
+#msr=args.multiscale_range
+
 print('classes',n)
+print('rescale_factor',rsc_factor)
+msr=None
+#print('multiscale_range',msr)
 
 empty_tensor = torch.tensor(0)
-
 resize_mask = partial(
     resize, order=0, preserve_range=True, anti_aliasing=False)
 
@@ -46,8 +51,8 @@ class SegmentationDataset(Dataset):
         - cont (optional): tensor of size (C, H, W) with type long, only when `contour` is `True`
     """
 
-    def __init__(self, root_dir, n_classes=n ,mode=None, contour=False, target_size=None, rescale_factor=None,
-                 multiscale_range=None, train=True, proportion=1, seed=0):
+    def __init__(self, root_dir, n_classes=n ,mode=None, contour=False, target_size=None, rescale_factor=rsc_factor,
+                 multiscale_range=msr, train=True, proportion=1, seed=0):
         """Initialize a new SegmentationDataset.
 
         Args:
@@ -82,12 +87,12 @@ class SegmentationDataset(Dataset):
 
         self.contour = contour
         self.target_size = target_size
-        self.rescale_factor = rescale_factor
+        self.rescale_factor = rsc_factor
 
         self.train = train
         self.proportion = proportion
         self.n_classes = n_classes
-        self.multiscale_range = multiscale_range
+        self.multiscale_range = msr
 
         # indexes to pick image/mask from
         self.picked = np.arange(len(self.img_paths))
@@ -102,23 +107,33 @@ class SegmentationDataset(Dataset):
 
     def _resize_image_and_mask(self, img, mask=None):
         height, width = img.shape[:2]
+        #print("BEFORE", "rescale factor:", self.rescale_factor, "height:", height, "width", width)
         if self.target_size is not None:
             target_height, target_width = self.target_size
+            #print("1")
         elif self.multiscale_range is not None:
             self.rescale_factor = np.random.uniform(*self.multiscale_range)
             target_height = int(np.ceil(self.rescale_factor * height))
             target_width = int(np.ceil(self.rescale_factor * width))
+            #print("2")
         elif self.rescale_factor is not None:
+            #Scales down the height and width by the allocated rescale factor
             target_height = int(np.ceil(self.rescale_factor * height))
             target_width = int(np.ceil(self.rescale_factor * width))
+            #print("3")
         else:
+            #Keep the heights and widths the same as the raw input image
             target_height, target_width = height, width
 
+        #print("AFTER", "rescale factor:", self.rescale_factor, "height:", target_height, "width", target_width)
         img = resize_img(img, (target_height, target_width))
+        #print("resize_img:", img.shape)
 
         # pixel-level annotation mask
         if mask is not None:
             mask = resize_mask(mask, (target_height, target_width))
+
+        #print("resize_mask:", mask.shape)
 
         return img, mask
 
@@ -130,7 +145,7 @@ class SegmentationDataset(Dataset):
                                  val_shift_limit=10, p=1),
             A.RandomBrightnessContrast(brightness_limit=0.1,
                                        contrast_limit=0.1, p=1),
-            A.CLAHE(p=0.5),
+            A.CLAHE(p=0.5), #Contrast Limited Adaptive Histogram Equalization
             A.ElasticTransform(p=0.5),
             A.Blur(blur_limit=3, p=0.5),
             A.HorizontalFlip(p=0.5),
@@ -142,7 +157,7 @@ class SegmentationDataset(Dataset):
         return augmented['image'], augmented.get('mask', None)
 
     def _convert_image_and_mask_to_tensor(self, img, mask):
-        #print(img.shape)
+        #print("BEFORE   mask:",mask.shape, "image:", img.shape)
         img = TF.to_tensor(img)
         if mask is not None:
             if self.contour:
@@ -158,7 +173,7 @@ class SegmentationDataset(Dataset):
                                    for i in range(self.n_classes)])
             cont = torch.as_tensor(cont.astype('int64'), dtype=torch.long)
             return img, mask, cont
-        #print(mask.shape, img.shape)
+        #print("mask:",mask.shape, "image:", img.shape)
         return img, mask
 
     def __getitem__(self, idx):
@@ -205,7 +220,7 @@ class AreaConstraintDataset(SegmentationDataset):
         - area: a 2-element (lower and upper bound) vector tensor with type float32
     """
 
-    def __init__(self, root_dir, target_size=None, rescale_factor=None, area_type='decimal',
+    def __init__(self, root_dir, target_size=None, rescale_factor=rsc_factor, area_type='decimal',
                  constraint='equality', margin=0.1, train=True, proportion=1.0):
         """Construct a new AreaConstraintDataset instance.
 
@@ -226,7 +241,7 @@ class AreaConstraintDataset(SegmentationDataset):
         """
         #self.n_classes=n_classes
         super().__init__(root_dir, mode='area', target_size=target_size,
-                         rescale_factor=rescale_factor, train=train, proportion=proportion)
+                         rescale_factor=rsc_factor, train=train, proportion=proportion)
 
         # area information (# foreground pixels divided by total pixels, between 0 and 1)
         self.area_info = pd.read_csv(
@@ -298,11 +313,11 @@ class PointSupervisionDataset(SegmentationDataset):
         - point_mask: point-level annotation of size (C, H, W) with type long or an empty tensor
     """
 
-    def __init__(self, root_dir, target_size=None, rescale_factor=None,
-                 multiscale_range=None, radius=0, train=True, proportion=1):
+    def __init__(self, root_dir, target_size=None, rescale_factor=rsc_factor,
+                 multiscale_range=msr, radius=0, train=True, proportion=1):
         super().__init__(root_dir, mode='point', target_size=target_size,
-                         rescale_factor=rescale_factor, train=train,
-                         proportion=proportion, multiscale_range=multiscale_range)
+                         rescale_factor=rsc_factor, train=train,
+                         proportion=proportion, multiscale_range=msr)
 
         # path to point supervision directory
         self.point_root = self.root_dir / 'points'
@@ -428,11 +443,11 @@ class Digest2019PointDataset(SegmentationDataset):
         - point_mask: point-level annotation of size (C, H, W) with type long or an empty tensor
     """
 
-    def __init__(self, root_dir, target_size=None, rescale_factor=None,
-                 multiscale_range=None, radius=0, train=True, proportion=1):
+    def __init__(self, root_dir, target_size=None, rescale_factor=rsc_factor,
+                 multiscale_range=msr, radius=0, train=True, proportion=1):
         super().__init__(root_dir, mode='point', target_size=target_size,
-                         rescale_factor=rescale_factor, train=train,
-                         proportion=proportion, multiscale_range=multiscale_range)
+                         rescale_factor=rsc_factor, train=train,
+                         proportion=proportion, multiscale_range=msr)
 
         # path to point supervision directory
         self.point_root = self.root_dir / 'points'
