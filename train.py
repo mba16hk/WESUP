@@ -11,6 +11,7 @@ from utils.metrics import dice
 import argparse
 import csv
 import torch
+import models
 
 def build_cli_parser():
     parser = argparse.ArgumentParser('Training Function.')
@@ -22,6 +23,8 @@ def build_cli_parser():
     parser.add_argument('-b', '--batch', default=1, type=int, help='Batch size for training at each epoch.')
     parser.add_argument('-k', '--checkpoint', default=None, help='Path to checkpoint.')
     parser.add_argument('-o', '--output', help='Path to output directory')
+    parser.add_argument('-r', '--rescale_factor', default=None, type=float, help='Rescaling Factor')
+    parser.add_argument('-m', '--multiscale_range', default=None, type=float, help='multiscale_range')
     return parser
 
 def read_class_weights(weights_file):
@@ -59,5 +62,5 @@ if __name__ == '__main__':
         weights=3,1
     
     fit(args.dataset_path, model= "wesup", class_weights=weights, n_classes=args.n_classes,
-     epochs=args.epochs, batch_size=args.batch, proportion=args.proportion)
+     epochs=args.epochs, batch_size=args.batch, proportion=args.proportion, checkpoint=args.checkpoint)
     #fire.Fire(fit)
