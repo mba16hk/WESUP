@@ -16,7 +16,7 @@ from tqdm import tqdm
 from PIL import Image
 from skimage.morphology import opening
 
-import train
+from models.base import train
 from models import initialize_trainer
 from utils.data import SegmentationDataset
 
@@ -142,25 +142,28 @@ def infer(trainer, data_dir, output_dir=None, input_size=None,
 
 def main(data_dir, model_type='wesup', checkpoint=None, output_dir=None,
          input_size=None, scales=(0.5,), num_workers=4, device=None):
-    print(output_dir)
+    
     if output_dir is None and checkpoint is not None:
         checkpoint = Path(checkpoint)
         output_dir = checkpoint.parent.parent / 'results'
         if not output_dir.exists():
             output_dir.mkdir()
-
+    
     device = device or ('cuda' if torch.cuda.is_available() else 'cpu')
+    
     trainer = initialize_trainer(model_type, device=device)
     if checkpoint is not None:
         trainer.load_checkpoint(checkpoint)
+        print('hi')
 
     infer(trainer, data_dir, output_dir, input_size=input_size,
           scales=scales, num_workers=num_workers, device=device)
 
 
+parser = train.build_cli_parser()
+args = parser.parse_args()
+
 if __name__ == '__main__':
-    parser = train.build_cli_parser()
-    args = parser.parse_args()
 
     main(data_dir=args.dataset_path, model_type='wesup', checkpoint=args.checkpoint, output_dir=args.output,
          input_size=None, scales=(0.5,), num_workers=4, device=None)
