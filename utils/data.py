@@ -24,12 +24,9 @@ parser = train.build_cli_parser()
 args = parser.parse_args()
 n= args.n_classes
 rsc_factor=args.rescale_factor
-#msr=args.multiscale_range
+msr=args.multiscale_range
 
-print('classes',n)
-print('rescale_factor',rsc_factor)
-msr=None
-#print('multiscale_range',msr)
+print('There are',n, 'classes in this dataset. The rescale factor for the images is:',rsc_factor)
 
 empty_tensor = torch.tensor(0)
 resize_mask = partial(
@@ -320,7 +317,7 @@ class PointSupervisionDataset(SegmentationDataset):
                          proportion=proportion, multiscale_range=msr)
 
         # path to point supervision directory
-        self.point_root = self.root_dir / 'points'
+        self.point_root = os.path.join(self.root_dir,'points')
 
         # path to point annotation files
         self.point_paths = sorted(self.point_root.glob('*.csv'))
