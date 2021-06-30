@@ -15,16 +15,26 @@ import models
 
 def build_cli_parser():
     parser = argparse.ArgumentParser('Training Function.')
-    parser.add_argument('dataset_path', help='Path to folder of dataset.')
-    parser.add_argument('-c', '--class_weights', default=None, help='Path to calculated weights')
-    parser.add_argument('-e', '--epochs', default=2, type=int, help='Number of training epochs')
-    parser.add_argument('-N', '--n_classes', default=2, type=int, help='Number of object classes')
-    parser.add_argument('-p', '--proportion', default=1, type=float, help='Proportion of images to be trained on.')
-    parser.add_argument('-b', '--batch', default=1, type=int, help='Batch size for training at each epoch.')
-    parser.add_argument('-k', '--checkpoint', default=None, help='Path to checkpoint.')
-    parser.add_argument('-o', '--output', help='Path to output directory')
-    parser.add_argument('-r', '--rescale_factor', default=None, type=float, help='Rescaling Factor')
-    parser.add_argument('-m', '--multiscale_range', default=None, type=float, help='multiscale_range')
+    parser.add_argument('dataset_path',
+     help='Path to folder of dataset.')
+    parser.add_argument('-c', '--class_weights', default=None,
+     help='Path to calculated weights')
+    parser.add_argument('-e', '--epochs', default=2, type=int,
+     help='Number of training epochs, a non-zero integer')
+    parser.add_argument('-N', '--n_classes', default=2, type=int,
+     help='Number of object classes, a non-zero integer')
+    parser.add_argument('-p', '--proportion', default=1, type=float,
+     help='Proportion of images to be trained on, a number between 0 and 1.')
+    parser.add_argument('-b', '--batch', default=1, type=int,
+     help='Batch size for training at each epoch, a non-zero integer.')
+    parser.add_argument('-k', '--checkpoint', default=None,
+     help='Path to checkpoint, found in RECORDS directory.')
+    parser.add_argument('-o', '--output',
+     help='Path to output directory')
+    parser.add_argument('-r', '--rescale_factor', default=0.4, type=float,
+     help='Rescaling Factor, a number between 0 and 1')
+    parser.add_argument('-m', '--multiscale_range', default=None, type=float, nargs='+',
+     help='multiscale_range, takes 2 numbers, where the first number passed is less than the second number. Both numbers can be any values between 0 and 1.')
     return parser
 
 def read_class_weights(weights_file):
@@ -62,5 +72,6 @@ if __name__ == '__main__':
         weights=3,1
     
     fit(args.dataset_path, model= "wesup", class_weights=weights, n_classes=args.n_classes,
-     epochs=args.epochs, batch_size=args.batch, proportion=args.proportion, checkpoint=args.checkpoint)
+     epochs=args.epochs, batch_size=args.batch, proportion=args.proportion, checkpoint=args.checkpoint,
+     rescale_factor=args.rescale_factor, multiscale_range=args.multiscale_range)
     #fire.Fire(fit)
