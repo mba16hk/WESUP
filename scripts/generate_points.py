@@ -91,7 +91,7 @@ if __name__ == '__main__':
         print('Cannot generate dot annotation without masks.')
         sys.exit(1)
 
-    label_dir = os.path.join(args.root_dir, f'points-{str(args.point_ratio)}')
+    label_dir = os.path.join(args.root_dir,'points')
 
     if not os.path.exists(label_dir):
         os.mkdir(label_dir)
