@@ -538,9 +538,10 @@ class WESUPTrainer(BaseTrainer):
                 if self.kwargs.get('enable_propagation'):
                     metrics['propagated_labels'] = propagated_labels.sum().item()
                     metrics['propagate_loss'] = propagate_loss.item()
+            #print("weakly supervised")
         else:  # fully-supervised mode
             loss = self.xentropy(sp_pred, sp_labels)
-            #print("supervised")
+            #print("fully supervised")
 
         # clear outdated superpixel prediction
         self.model.sp_pred = None
