@@ -13,7 +13,17 @@ from utils import is_empty_tensor
 from utils.data import SegmentationDataset
 from utils.data import Digest2019PointDataset
 from .base import BaseConfig, BaseTrainer
+import train
 
+parser = train.build_cli_parser()
+args = parser.parse_args()
+no_of_classes=args.n_classes
+
+#If a class_weights argument is passed, read it, else, use the default.
+if args.class_weights is not None:
+    weights=train.read_class_weights(args.class_weights)
+else:
+    weights=None
 
 def _preprocess_superpixels(segments, mask=None, epsilon=1e-7):
     """Segment superpixels of a given image and return segment maps and their labels.
@@ -63,7 +73,7 @@ def _preprocess_superpixels(segments, mask=None, epsilon=1e-7):
     return sp_maps, sp_labels
 
 
-def _cross_entropy(y_hat, y_true, class_weights=None, epsilon=1e-7):
+def _cross_entropy(y_hat, y_true, class_weights=weights, epsilon=1e-7):
     """Semi-supervised cross entropy loss function.
 
     Args:
@@ -89,8 +99,6 @@ def _cross_entropy(y_hat, y_true, class_weights=None, epsilon=1e-7):
         return torch.tensor(0.).to(device)
 
     ce = -y_true * torch.log(y_hat)
-    #print("wesup, ce:", ce.shape)
-
     if class_weights is not None:
         ce = ce * class_weights[...,None]
         #ce = ce * class_weights.unsqueeze(0).float()
@@ -151,7 +159,7 @@ class WESUPConfig(BaseConfig):
     multiscale_range = (0.3, 0.4)
 
     # Number of target classes.
-    n_classes = 2
+    n_classes = no_of_classes
 
     # Class weights for cross-entropy loss function.
     class_weights=(3, 1)
@@ -185,7 +193,7 @@ class WESUPConfig(BaseConfig):
 class WESUP(nn.Module):
     """Weakly supervised histopathology image segmentation with sparse point annotations."""
 
-    def __init__(self, n_classes=2, D=32, **kwargs):
+    def __init__(self, n_classes=no_of_classes, D=32, **kwargs):
         """Initialize a WESUP model.
 
         Kwargs:
@@ -203,6 +211,7 @@ class WESUP(nn.Module):
 
         # sum of channels of all feature maps
         self.fm_channels_sum = 0
+        #print('No of classes in wesup.py',n_classes)
 
         # side convolution layers after each conv feature map
         for layer in self.backbone:
@@ -233,7 +242,7 @@ class WESUP(nn.Module):
             nn.Linear(D, self.kwargs.get('n_classes', n_classes)),
             nn.Softmax(dim=1)
         )
-
+        #print('No of classes in wesup.py 2',n_classes)
         # store conv feature maps
         self.feature_maps = None
 
@@ -310,7 +319,7 @@ class WESUP(nn.Module):
 class WESUPPixelInference(WESUP):
     """Weakly supervised histopathology image segmentation with sparse point annotations."""
 
-    def __init__(self, n_classes=2, D=32, **kwargs):
+    def __init__(self, n_classes=no_of_classes, D=32, **kwargs):
         """Initialize a WESUP model.
 
         Kwargs:
@@ -359,6 +368,7 @@ class WESUPPixelInference(WESUP):
             nn.Softmax(dim=1)
         )
         
+        #print('No of classes in wesup.py 3',n_classes)
         # store conv feature maps
         self.feature_maps = None
 
