@@ -28,11 +28,11 @@ def build_cli_parser():
     parser = argparse.ArgumentParser('Cropping Function.')
     parser.add_argument('dataset_path', help='Path to dataset to crop.')
     parser.add_argument('-o', '--output', default='cropped_data',
-                        help='Path to output croppped dataset')
+     help='Path to output croppped dataset')
     parser.add_argument('-r','--reduce', choices=['t', 'c', 's'],
-                        help='Type t for tiling, c for cropping, and s for rescaling.')
+     help='Type t for tiling, c for cropping, and s for rescaling.')
     parser.add_argument('-N','--tile_number', type=int , default = 'None',
-                        help='If tiling, the image will be chopped into NxN tiles. If cropping, the image will be chopped into NxN pixels. If rescaling, N would be any value greater than 0 and less than or equal to 1.')
+     help='If tiling, the image will be chopped into NxN tiles. If cropping, the image will be chopped into NxN pixels. If rescaling, N would be any value greater than 0 and less than or equal to 1.')
     return parser
 
 def rescale_images(orig_path, dst_path, filetype, N) :
@@ -137,25 +137,27 @@ def tile_images(orig_path, dst_path, filetype, N) :
                         resc_img_dir= j(dst_sub_dir,'rescaled_images')
                         if not os.path.exists(resc_img_dir):
                             os.mkdir(resc_img_dir)
-                        if (w*h)>(100*10**6) :
-                            scale= 0.5
+                        if (w*h)>(90*10**6) :
+                            scale= 0.38
                             rs_im = rescale_image_sep_dir(resc_img_dir,file, scale) 
-                        elif (w*h)>(80*10**6) and (w*h)<=(100*10**6):
-                            scale= 0.55
-                            rs_im = rescale_image_sep_dir(resc_img_dir,file, scale) 
-                        elif (w*h)>(70*10**6) and (w*h)<=(80*10**6) :
-                            scale= 0.65
-                            rs_im = rescale_image_sep_dir(resc_img_dir,file, scale) 
-                        elif (w*h)>(60*10**6) and (w*h)<=(70*10**6) :
-                            scale= 0.75
-                            rs_im = rescale_image_sep_dir(resc_img_dir,file, scale) 
+                        elif (w*h)>(50*10**6) and (w*h)<=(80*10**6):
+                            scale= 0.48
+                            rs_im = rescale_image_sep_dir(resc_img_dir,file, scale)
+                        elif (w*h)>(30*10**6) and (w*h)<=(50*10**6) :
+                            scale= 0.58
+                            rs_im = rescale_image_sep_dir(resc_img_dir,file, scale)
+                        elif (w*h)>(10*10**6) and (w*h)<=(30*10**6) :
+                            scale= 0.68
+                            rs_im = rescale_image_sep_dir(resc_img_dir,file, scale)
                         else :
                             scale=1
                             rs_im=file
                             
-                        if N==0 :   
-                            Nw=round(w/(600*scale))
-                            Nh=round(h/(600*scale))
+                        if N==0 :
+                            im=Image.open(rs_im)
+                            w, h = im.size   
+                            Nw=round(w/720)
+                            Nh=round(h/720)
                             tiles=image_slicer.slice(rs_im,row=Nh,
                                                      col=Nw,save= False)
                         else :
