@@ -24,7 +24,7 @@ def build_cli_parser():
     parser.add_argument(
         'dataset_path', help='Path to original unzipped Amgad dataset.')
     #accepts argument for validation set size, otherwise use default
-    parser.add_argument('--val-size', type=float, default=0.1,
+    parser.add_argument('--val_size', type=float, default=0.1,
                         help='Validation size (between 0 and 1)')
     #accepts to output params into designated directory
     parser.add_argument('-o', '--output', default='data',
@@ -46,9 +46,8 @@ def split_train_val_test(orig_path, val_size=0.1):
         trains, y, test_size=val_size)
     
     tests = []
-    tests.extend(val_set)
-    tests.extend(train_set[0:round(len(train_set)*0.1)])
-    del train_set[0:round(len(train_set)*0.1)]
+    tests.extend(train_set[0:round(len(train_set)*0.15)])
+    del train_set[0:round(len(train_set)*0.15)]
     print("tests:", len(tests), "trains:", len(train_set), "vals:", len(val_set))
     return train_set, val_set, tests #returns these datasets
 
