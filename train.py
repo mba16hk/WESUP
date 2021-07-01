@@ -65,13 +65,8 @@ def fit(dataset_path, model='wesup', **kwargs):
 if __name__ == '__main__':
     parser = build_cli_parser()
     args = parser.parse_args()
-
-    if args.class_weights is not None:
-        weights=read_class_weights(args.class_weights)
-    else:
-        weights=3,1
     
-    fit(args.dataset_path, model= "wesup", class_weights=weights, n_classes=args.n_classes,
+    fit(args.dataset_path, model= "wesup", class_weights=args.class_weights, n_classes=args.n_classes,
      epochs=args.epochs, batch_size=args.batch, proportion=args.proportion, checkpoint=args.checkpoint,
      rescale_factor=args.rescale_factor, multiscale_range=args.multiscale_range)
     #fire.Fire(fit)
