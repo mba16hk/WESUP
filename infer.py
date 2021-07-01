@@ -154,7 +154,6 @@ def main(data_dir, model_type='wesup', checkpoint=None, output_dir=None,
     trainer = initialize_trainer(model_type, device=device)
     if checkpoint is not None:
         trainer.load_checkpoint(checkpoint)
-        print('hi')
 
     infer(trainer, data_dir, output_dir, input_size=input_size,
           scales=scales, num_workers=num_workers, device=device)
