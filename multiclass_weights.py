@@ -11,6 +11,7 @@ import argparse
 import itertools
 
 j=os.path.join
+base=os.path.basename
 dirname=os.path.dirname
 Image.MAX_IMAGE_PIXELS = 194221750
 
@@ -52,7 +53,7 @@ def calculate_weights(dataset_path,destination_path ,filetype) :
     ratio= [x / imgsize for x in n]
     weights=[1-x for x in ratio]
     weights[0]=0
-    np.savetxt(j(destination_path,"weights.csv"), weights, delimiter=',') 
+    np.savetxt(j(destination_path,f"weights-{str(base(dirname(dirname(args.dataset_path))))}.csv"), weights, delimiter=',') 
     
 def file_extension(dataset_path) :
     orig_path=j(dataset_path,"masks")
