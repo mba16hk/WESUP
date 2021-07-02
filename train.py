@@ -43,6 +43,7 @@ def read_class_weights(weights_file):
         reader = csv.reader(csvfile, quoting=csv.QUOTE_NONNUMERIC) # change contents to floats
         for row in reader: # each row is a list
             results.append(row)
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     list_to_tensor = torch.FloatTensor(results)
     return list_to_tensor
 
