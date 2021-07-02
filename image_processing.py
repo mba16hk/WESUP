@@ -137,16 +137,16 @@ def tile_images(orig_path, dst_path, filetype, N) :
                         resc_img_dir= j(dst_sub_dir,'rescaled_images')
                         if not os.path.exists(resc_img_dir):
                             os.mkdir(resc_img_dir)
-                        if (w*h)>(90*10**6) :
+                        if (w*h)>(80*10**6) :
                             scale= 0.38
                             rs_im = rescale_image_sep_dir(resc_img_dir,file, scale) 
-                        elif (w*h)>(50*10**6) and (w*h)<=(80*10**6):
+                        elif (w*h)>(45*10**6) and (w*h)<=(80*10**6):
                             scale= 0.48
                             rs_im = rescale_image_sep_dir(resc_img_dir,file, scale)
-                        elif (w*h)>(30*10**6) and (w*h)<=(50*10**6) :
+                        elif (w*h)>(25*10**6) and (w*h)<=(45*10**6) :
                             scale= 0.58
                             rs_im = rescale_image_sep_dir(resc_img_dir,file, scale)
-                        elif (w*h)>(10*10**6) and (w*h)<=(30*10**6) :
+                        elif (w*h)>(10*10**6) and (w*h)<=(25*10**6) :
                             scale= 0.68
                             rs_im = rescale_image_sep_dir(resc_img_dir,file, scale)
                         else :
@@ -156,8 +156,8 @@ def tile_images(orig_path, dst_path, filetype, N) :
                         if N==0 :
                             im=Image.open(rs_im)
                             w, h = im.size   
-                            Nw=round(w/720)
-                            Nh=round(h/720)
+                            Nw=round(w/650)
+                            Nh=round(h/650)
                             tiles=image_slicer.slice(rs_im,row=Nh,
                                                      col=Nw,save= False)
                         else :
