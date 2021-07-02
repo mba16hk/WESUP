@@ -46,8 +46,8 @@ def split_train_val_test(orig_path, val_size=0.1):
         trains, y, test_size=val_size)
     
     tests = []
-    tests.extend(train_set[0:round(len(train_set)*0.15)])
-    del train_set[0:round(len(train_set)*0.15)]
+    tests.extend(train_set[0:round(len(train_set)*0.25)])
+    del train_set[0:round(len(train_set)*0.25)]
     print("tests:", len(tests), "trains:", len(train_set), "vals:", len(val_set))
     return train_set, val_set, tests #returns these datasets
 
