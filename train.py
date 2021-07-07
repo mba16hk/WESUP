@@ -33,6 +33,8 @@ def build_cli_parser():
      help='Path to output directory')
     parser.add_argument('-r', '--rescale_factor', default=0.4, type=float,
      help='Rescaling Factor, a number between 0 and 1')
+    parser.add_argument('--momentum', default=0.9, type=float,
+     help='Momentum term, a number between 0 and 1')
     parser.add_argument('-m', '--multiscale_range', default=None, type=float, nargs='+',
      help='multiscale_range, takes 2 numbers, where the first number passed is less than the second number. Both numbers can be any values between 0 and 1.')
     return parser
@@ -44,7 +46,7 @@ def read_class_weights(weights_file):
         for row in reader: # each row is a list
             results.append(row)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    list_to_tensor = torch.FloatTensor(results)
+    list_to_tensor = torch.FloatTensor(results).squeeze(1)
     return list_to_tensor
 
 def fit(dataset_path, model='wesup', **kwargs):
@@ -69,5 +71,5 @@ if __name__ == '__main__':
     
     fit(args.dataset_path, model= "wesup", class_weights=args.class_weights, n_classes=args.n_classes,
      epochs=args.epochs, batch_size=args.batch, proportion=args.proportion, checkpoint=args.checkpoint,
-     rescale_factor=args.rescale_factor, multiscale_range=args.multiscale_range)
+     rescale_factor=args.rescale_factor, multiscale_range=args.multiscale_range, momentum=args.momentum)
     #fire.Fire(fit)
