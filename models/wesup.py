@@ -18,10 +18,14 @@ import train
 parser = train.build_cli_parser()
 args = parser.parse_args()
 no_of_classes=args.n_classes
+momentum_val=args.momentum
+rsc_factr=args.rescale_factor
+batch=args.batch
 
 #If a class_weights argument is passed, read it, else, use the default.
 if args.class_weights is not None:
     weights=train.read_class_weights(args.class_weights)
+    weights = weights.to("cuda" if torch.cuda.is_available() else "cpu")
 else:
     weights=None
 
@@ -57,7 +61,6 @@ def _preprocess_superpixels(segments, mask=None, epsilon=1e-7):
        
         # quantize superpixel labels (e.g., from (0.7, 0.3) to (1.0, 0.0))
         sp_labels = sp_labels[labeled_sps]
-        #print(sp_labels.max())
         sp_labels = (sp_labels == sp_labels.max(
             dim=-1, keepdim=True)[0]).float()
     else:  # no supervision provided
@@ -99,8 +102,10 @@ def _cross_entropy(y_hat, y_true, class_weights=weights, epsilon=1e-7):
         return torch.tensor(0.).to(device)
 
     ce = -y_true * torch.log(y_hat)
+    #print("ce",ce.shape)
+    #print("class_weights",class_weights.shape)
     if class_weights is not None:
-        ce = ce * class_weights[...,None]
+        ce = ce * class_weights
         #ce = ce * class_weights.unsqueeze(0).float()
         
     return torch.sum(ce) / labeled_samples
@@ -153,7 +158,7 @@ class WESUPConfig(BaseConfig):
     """Configuration for WESUP model."""
 
     # Rescale factor to subsample input images.
-    rescale_factor = 0.5
+    rescale_factor = rsc_factr
 
     # multi-scale range for training
     multiscale_range = (0.3, 0.4)
@@ -179,14 +184,14 @@ class WESUPConfig(BaseConfig):
     propagate_weight = 0.5
 
     # Optimization parameters.
-    momentum = 0.9
+    momentum = momentum_val
     weight_decay = 0.001
 
     # Whether to freeze backbone.
     freeze_backbone = False
 
     # Training configurations.
-    batch_size = 1
+    batch_size = batch
     epochs = 300
 
 
@@ -464,7 +469,8 @@ class WESUPTrainer(BaseTrainer):
         )
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer, 'min', patience=10, factor=0.5, min_lr=1e-5, verbose=True)
-
+        #print('Momentum', self.kwargs.get('momentum'))
+        #print('weight decay', self.kwargs.get('weight_decay'))
         return optimizer, None
 
     def preprocess(self, *data):
@@ -485,7 +491,7 @@ class WESUPTrainer(BaseTrainer):
         else:
             raise ValueError('Invalid input data for WESUP')
 
-        print("image shape:",img.shape)
+        #print("image shape:",img.shape)
         # if img.shape[0]>1:
         #     for i in range(0,img.shape[0]):
         segments = slic(
@@ -559,7 +565,10 @@ class WESUPTrainer(BaseTrainer):
         return loss
 
     def postprocess(self, pred, target=None):
+        print(pred)
+        print("pred bfr",torch.sum(pred))
         pred = pred.round().long()
+        print("pred aftr",torch.sum(pred))
         if target is not None:
             return pred, target[0].argmax(dim=1)
         return pred
