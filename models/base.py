@@ -17,13 +17,15 @@ from utils.history import HistoryTracker
 parser = train.build_cli_parser()
 args = parser.parse_args()
 checkpoint_path=args.checkpoint
+batch=args.batch
 
+#print("CPU Count",os.cpu_count())
 
 class BaseConfig:
     """A base model configuration class."""
 
     # batch size for training
-    batch_size = 1
+    batch_size = batch
 
     # number of epochs for training
     epochs = 10
@@ -41,7 +43,7 @@ class BaseConfig:
             if not attr.startswith('_') and attr != 'to_dict'
         }
 
-
+#The BaseTrainer inherits from the abstract base class
 class BaseTrainer(ABC):
     """A base trainer class."""
 
@@ -307,7 +309,7 @@ class BaseTrainer(ABC):
             val_dataset = self.get_default_dataset(val_path, train=False)
             val_dataset.summary(logger=self.logger)
             self.dataloaders['val'] = torch.utils.data.DataLoader(
-                val_dataset, batch_size=1,
+                val_dataset, batch_size=self.kwargs.get('batch_size'),
                 num_workers=os.cpu_count())
 
         self.logger.info(underline('\nTraining Stage', '='))
