@@ -13,21 +13,6 @@ from utils import is_empty_tensor
 from utils.data import SegmentationDataset
 from utils.data import Digest2019PointDataset
 from .base import BaseConfig, BaseTrainer
-import train
-
-parser = train.build_cli_parser()
-args = parser.parse_args()
-no_of_classes=args.n_classes
-momentum_val=args.momentum
-rsc_factr=args.rescale_factor
-batch=args.batch
-
-#If a class_weights argument is passed, read it, else, use the default.
-if args.class_weights is not None:
-    weights=train.read_class_weights(args.class_weights)
-    weights = weights.to("cuda" if torch.cuda.is_available() else "cpu")
-else:
-    weights=None
 
 def _preprocess_superpixels(segments, mask=None, epsilon=1e-7):
     """Segment superpixels of a given image and return segment maps and their labels.
@@ -42,7 +27,7 @@ def _preprocess_superpixels(segments, mask=None, epsilon=1e-7):
     """
     # ordering of superpixels
     sp_idx_list = segments.unique()
-    #print(sp_idx_list)
+    #print('sp_idx_list first', sp_idx_list)
     if mask is not None and not is_empty_tensor(mask) :#and (torch.max(mask)>0):
         def compute_superpixel_label(sp_idx):
             sp_mask = (mask * (segments == sp_idx).long()).float()
@@ -58,6 +43,7 @@ def _preprocess_superpixels(segments, mask=None, epsilon=1e-7):
         labeled_sps = (sp_labels.sum(dim=-1) > 0).nonzero().flatten()
         unlabeled_sps = (sp_labels.sum(dim=-1) == 0).nonzero().flatten()
         sp_idx_list = torch.cat([labeled_sps, unlabeled_sps])
+        #print('sp_idx_list', sp_idx_list)
        
         # quantize superpixel labels (e.g., from (0.7, 0.3) to (1.0, 0.0))
         sp_labels = sp_labels[labeled_sps]
@@ -76,7 +62,7 @@ def _preprocess_superpixels(segments, mask=None, epsilon=1e-7):
     return sp_maps, sp_labels
 
 
-def _cross_entropy(y_hat, y_true, class_weights=weights, epsilon=1e-7):
+def _cross_entropy(y_hat, y_true, class_weights=None, epsilon=1e-7):
     """Semi-supervised cross entropy loss function.
 
     Args:
@@ -91,6 +77,7 @@ def _cross_entropy(y_hat, y_true, class_weights=weights, epsilon=1e-7):
     """
     #print("y_true", y_true)
     device = y_hat.device
+    #print('class_weights', class_weights)
 
     # clamp all elements to prevent numerical overflow/underflow
     y_hat = torch.clamp(y_hat, min=epsilon, max=(1 - epsilon))
@@ -158,16 +145,16 @@ class WESUPConfig(BaseConfig):
     """Configuration for WESUP model."""
 
     # Rescale factor to subsample input images.
-    rescale_factor = rsc_factr
+    rescale_factor = 0.5
 
     # multi-scale range for training
     multiscale_range = (0.3, 0.4)
 
     # Number of target classes.
-    n_classes = no_of_classes
+    n_classes = 2
 
     # Class weights for cross-entropy loss function.
-    class_weights=(3, 1)
+    class_weights= None
     #class_weights = torch.rand(n_classes,1,device="cuda" if torch.cuda.is_available() else "cpu") #, device="cuda"
 
     # Superpixel parameters.
@@ -184,21 +171,21 @@ class WESUPConfig(BaseConfig):
     propagate_weight = 0.5
 
     # Optimization parameters.
-    momentum = momentum_val
+    momentum = 0.9
     weight_decay = 0.001
 
     # Whether to freeze backbone.
     freeze_backbone = False
 
     # Training configurations.
-    batch_size = batch
+    batch_size = 1
     epochs = 300
 
 
 class WESUP(nn.Module):
     """Weakly supervised histopathology image segmentation with sparse point annotations."""
 
-    def __init__(self, n_classes=no_of_classes, D=32, **kwargs):
+    def __init__(self, n_classes=2, D=32, **kwargs):
         """Initialize a WESUP model.
 
         Kwargs:
@@ -244,7 +231,7 @@ class WESUP(nn.Module):
         #     nn.Softmax(dim=1)
         # )
         self.classifier = nn.Sequential(
-            nn.Linear(D, self.kwargs.get('n_classes', n_classes)),
+            nn.Linear(D, n_classes),
             nn.Softmax(dim=1)
         )
         #print('No of classes in wesup.py 2',n_classes)
@@ -324,7 +311,7 @@ class WESUP(nn.Module):
 class WESUPPixelInference(WESUP):
     """Weakly supervised histopathology image segmentation with sparse point annotations."""
 
-    def __init__(self, n_classes=no_of_classes, D=32, **kwargs):
+    def __init__(self, n_classes=2, D=32, **kwargs):
         """Initialize a WESUP model.
 
         Kwargs:
@@ -369,7 +356,7 @@ class WESUPPixelInference(WESUP):
         #     nn.Softmax(dim=1)
         # )
         self.classifier = nn.Sequential(
-            nn.Linear(D, self.kwargs.get('n_classes', n_classes)),
+            nn.Linear(D, n_classes),
             nn.Softmax(dim=1)
         )
         
@@ -440,25 +427,31 @@ class WESUPTrainer(BaseTrainer):
         Returns:
             trainer: a new WESUPTrainer instance
         """
-
+        
         config = WESUPConfig()
         if config.freeze_backbone:
             for param in model.backbone.parameters():
                 param.requires_grad = False
         kwargs = {**config.to_dict(), **kwargs}
         super().__init__(model, **kwargs)
-
+        #print('rescale factor', self.kwargs.get('rescale_factor'))
         # cross-entropy loss function
-        self.xentropy = partial(_cross_entropy)
+        self.xentropy = partial(_cross_entropy, class_weights=kwargs.get('class_weights'))
 
     def get_default_dataset(self, root_dir, train=True, proportion=1.0):
         if train:
             if osp.exists(osp.join(root_dir, 'points')):
-                return Digest2019PointDataset(root_dir, proportion=proportion,
+                #Enters this only if a points directory exists
+                return Digest2019PointDataset(root_dir, proportion=proportion, 
                                               multiscale_range=self.kwargs.get('multiscale_range'))
             return SegmentationDataset(root_dir, proportion=proportion,
-                                       multiscale_range=self.kwargs.get('multiscale_range'))
-        return SegmentationDataset(root_dir, rescale_factor=self.kwargs.get('rescale_factor'), train=False)
+                                       multiscale_range=self.kwargs.get('multiscale_range'),
+                                       rescale_factor=self.kwargs.get('rescale_factor'),
+                                       n_classes=self.kwargs.get('n_classes'),
+                                       swap0=self.kwargs.get('swap0'))
+        return SegmentationDataset(root_dir, rescale_factor=self.kwargs.get('rescale_factor'), train=False,
+                                   n_classes=self.kwargs.get('n_classes'),
+                                   swap0=self.kwargs.get('swap0'))
 
     def get_default_optimizer(self):
         optimizer = torch.optim.SGD(
@@ -565,10 +558,10 @@ class WESUPTrainer(BaseTrainer):
         return loss
 
     def postprocess(self, pred, target=None):
-        print(pred)
-        print("pred bfr",torch.sum(pred))
+        print(pred.shape)
+        #print("pred bfr",torch.sum(pred))
         pred = pred.round().long()
-        print("pred aftr",torch.sum(pred))
+        #print("pred aftr",torch.sum(pred))
         if target is not None:
             return pred, target[0].argmax(dim=1)
         return pred
