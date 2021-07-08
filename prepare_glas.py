@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Shuffle GlaS dataset to train/val/test sets.
 """

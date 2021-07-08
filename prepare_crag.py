@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Shuffle CRAG dataset to train/val/test sets.
 """

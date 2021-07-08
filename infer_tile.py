@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Inference module for window-based strategy.
 """

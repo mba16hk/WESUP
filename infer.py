@@ -1,7 +1,7 @@
+#!/usr/bin/env python3
 """
 Inference module.
 """
-#!/usr/bin/env python3
 import warnings
 from math import ceil
 from pathlib import Path
