@@ -1,7 +1,7 @@
 """
 Training module.
 """
-
+#!/usr/bin/env python3
 import logging
 from shutil import rmtree
 

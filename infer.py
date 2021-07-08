@@ -1,7 +1,7 @@
 """
 Inference module.
 """
-
+#!/usr/bin/env python3
 import warnings
 from math import ceil
 from pathlib import Path
@@ -28,7 +28,7 @@ For this module pass the following arguments:
 These are inherited from the train.py file in the build_cli_parser function
 """
 def build_cli_parser():
-    parser = argparse.ArgumentParser('Training Function.')
+    parser = argparse.ArgumentParser('Inference Function.')
     parser.add_argument('dataset_path',
      help='Path to folder of dataset.')
     parser.add_argument('-N', '--n_classes', default=2, type=int,
@@ -37,8 +37,6 @@ def build_cli_parser():
      help='Path to checkpoint, found in RECORDS directory.')
     parser.add_argument('-o', '--output',
      help='Path to output directory')
-    parser.add_argument('-r', '--rescale_factor', default=0.4, type=float,
-     help='Rescaling Factor, a number between 0 and 1')
     parser.add_argument('-w', '--num_workers', default=4, type=int,
      help='Number of workers in the dataloader, a non-zero integer')
     return parser
