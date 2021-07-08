@@ -5,7 +5,6 @@ Training module.
 import logging
 from shutil import rmtree
 
-#import fire
 from utils.metrics import accuracy
 from utils.metrics import dice
 import argparse
@@ -29,8 +28,6 @@ def build_cli_parser():
      help='Batch size for training at each epoch, a non-zero integer.')
     parser.add_argument('-k', '--checkpoint', default=None,
      help='Path to checkpoint, found in RECORDS directory.')
-    parser.add_argument('-o', '--output',
-     help='Path to output directory')
     parser.add_argument('-r', '--rescale_factor', default=0.4, type=float,
      help='Rescaling Factor, a number between 0 and 1')
     parser.add_argument('--momentum', default=0.9, type=float,
@@ -79,5 +76,4 @@ if __name__ == '__main__':
 
     fit(args.dataset_path, model= "wesup", class_weights=weights, n_classes=args.n_classes,
      epochs=args.epochs, batch_size=args.batch, proportion=args.proportion, checkpoint=args.checkpoint,
-     rescale_factor=args.rescale_factor, multiscale_range=args.multiscale_range, momentum=args.momentum)#,swap0=args.swap0)
-    #fire.Fire(fit)
+     rescale_factor=args.rescale_factor, multiscale_range=args.multiscale_range, momentum=args.momentum,swap0=args.swap0)
