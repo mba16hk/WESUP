@@ -81,6 +81,7 @@ class SegmentationDataset(Dataset):
         self.train = train
         self.proportion = proportion
         self.n_classes = n_classes
+        #print('classes in segdataset', n_classes)
         self.multiscale_range = multiscale_range
         self.swap0 = swap0
 
@@ -183,7 +184,7 @@ class SegmentationDataset(Dataset):
             #     mask[mask0]=1
             #     mask[mask1]=0
 
-            print("mask",np.unique(mask))
+            #print("mask",np.unique(mask))
         img, mask = self._resize_image_and_mask(img, mask)
 
         if self.train:

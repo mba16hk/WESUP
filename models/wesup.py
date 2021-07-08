@@ -499,16 +499,21 @@ class WESUPTrainer(BaseTrainer):
                            self.kwargs.get('sp_area')),
             compactness=self.kwargs.get('sp_compactness'),
         )
+        
         segments = torch.as_tensor(
             segments, dtype=torch.long, device=self.device)
+        #print('segments size', segments.shape)
 
         if point_mask is not None and not is_empty_tensor(point_mask):
             mask = point_mask.squeeze()
+            #print("1")
         elif pixel_mask is not None and not is_empty_tensor(pixel_mask):
             mask = pixel_mask.squeeze()
+            #print("2")
         else:
             mask = None
-        #print("mask shape:", mask.shape)
+            #print("3")
+        print("mask shape:", mask.shape)
         sp_maps, sp_labels = _preprocess_superpixels(
             segments, mask, epsilon=self.kwargs.get('epsilon'))
 
@@ -564,7 +569,7 @@ class WESUPTrainer(BaseTrainer):
         return loss
 
     def postprocess(self, pred, target=None):
-        print(pred.shape)
+        #print(pred.shape)
         #print("pred bfr",torch.sum(pred))
         pred = pred.round().long()
         #print("pred aftr",torch.sum(pred))
