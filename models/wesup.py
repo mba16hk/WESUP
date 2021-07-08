@@ -27,7 +27,7 @@ def _preprocess_superpixels(segments, mask=None, epsilon=1e-7):
     """
     # ordering of superpixels
     sp_idx_list = segments.unique()
-    #print('sp_idx_list first', sp_idx_list)
+    #print('sp_idx_list first', sp_idx_list.shape)
     if mask is not None and not is_empty_tensor(mask) :#and (torch.max(mask)>0):
         def compute_superpixel_label(sp_idx):
             sp_mask = (mask * (segments == sp_idx).long()).float()
@@ -38,17 +38,21 @@ def _preprocess_superpixels(segments, mask=None, epsilon=1e-7):
             compute_superpixel_label(sp_idx).unsqueeze(0)
             for sp_idx in range(segments.max() + 1)
         ])
-
+        #print('sp_labels0', sp_labels.shape)
         # move labeled superpixels to the front of `sp_idx_list`
         labeled_sps = (sp_labels.sum(dim=-1) > 0).nonzero().flatten()
+        #print('labelled sp', labeled_sps.shape)
         unlabeled_sps = (sp_labels.sum(dim=-1) == 0).nonzero().flatten()
+        #print('unlabelled sp', unlabeled_sps.shape)
         sp_idx_list = torch.cat([labeled_sps, unlabeled_sps])
-        #print('sp_idx_list', sp_idx_list)
+        #print('sp_idx_list', sp_idx_list.shape)
        
         # quantize superpixel labels (e.g., from (0.7, 0.3) to (1.0, 0.0))
-        sp_labels = sp_labels[labeled_sps]
+        sp_labels = sp_labels[labeled_sps] #same as sp_labels0 indexed at the labeled sp_positions (size of the labelled sp tensor)
+        #print('sp_labels1', sp_labels.shape)
         sp_labels = (sp_labels == sp_labels.max(
-            dim=-1, keepdim=True)[0]).float()
+            dim=-1, keepdim=True)[0]).float() #This is a 1 hot encoded vector of sp (finding the maximum)
+        #print('sp_labels2', sp_labels.shape)
     else:  # no supervision provided
         sp_labels = empty_tensor().to(segments.device)
 
@@ -58,7 +62,8 @@ def _preprocess_superpixels(segments, mask=None, epsilon=1e-7):
 
     # make sure each superpixel map sums to one
     sp_maps = sp_maps / sp_maps.sum(dim=(1, 2), keepdim=True)
-
+    #print('sp_maps', sp_maps.shape)
+    #print('sp_labels', sp_labels.shape)
     return sp_maps, sp_labels
 
 
@@ -443,7 +448,8 @@ class WESUPTrainer(BaseTrainer):
             if osp.exists(osp.join(root_dir, 'points')):
                 #Enters this only if a points directory exists
                 return Digest2019PointDataset(root_dir, proportion=proportion, 
-                                              multiscale_range=self.kwargs.get('multiscale_range'))
+                                              multiscale_range=self.kwargs.get('multiscale_range'),
+                                              rescale_factor=self.kwargs.get('rescale_factor'))
             return SegmentationDataset(root_dir, proportion=proportion,
                                        multiscale_range=self.kwargs.get('multiscale_range'),
                                        rescale_factor=self.kwargs.get('rescale_factor'),
