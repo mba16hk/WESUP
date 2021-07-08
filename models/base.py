@@ -5,7 +5,6 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from pathlib import Path
 import gc
-import train
 
 import torch
 import numpy as np
@@ -13,19 +12,13 @@ from tqdm import tqdm
 
 from utils import underline, record
 from utils.history import HistoryTracker
-
-parser = train.build_cli_parser()
-args = parser.parse_args()
-checkpoint_path=args.checkpoint
-batch=args.batch
-
 #print("CPU Count",os.cpu_count())
 
 class BaseConfig:
     """A base model configuration class."""
 
     # batch size for training
-    batch_size = batch
+    batch_size = 1
 
     # number of epochs for training
     epochs = 10
@@ -129,7 +122,7 @@ class BaseTrainer(ABC):
             loss: model loss
         """
 
-    def load_checkpoint(self, ckpt_path=checkpoint_path):
+    def load_checkpoint(self, ckpt_path=None):
         """Load checkpointed model weights, optimizer states, etc, from given path.
 
         Args:
