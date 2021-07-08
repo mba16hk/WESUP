@@ -16,7 +16,6 @@ from tqdm import tqdm
 from PIL import Image
 from skimage.morphology import opening
 
-import train
 from models import initialize_trainer
 from utils.data import SegmentationDataset
 
@@ -28,6 +27,21 @@ For this module pass the following arguments:
 
 These are inherited from the train.py file in the build_cli_parser function
 """
+def build_cli_parser():
+    parser = argparse.ArgumentParser('Training Function.')
+    parser.add_argument('dataset_path',
+     help='Path to folder of dataset.')
+    parser.add_argument('-N', '--n_classes', default=2, type=int,
+     help='Number of object classes, a non-zero integer')
+    parser.add_argument('-k', '--checkpoint', default=None,
+     help='Path to checkpoint, found in RECORDS directory.')
+    parser.add_argument('-o', '--output',
+     help='Path to output directory')
+    parser.add_argument('-r', '--rescale_factor', default=0.4, type=float,
+     help='Rescaling Factor, a number between 0 and 1')
+    parser.add_argument('-w', '--num_workers', default=4, type=int,
+     help='Number of workers in the dataloader, a non-zero integer')
+    return parser
 
 def predict_single_image(trainer, img, mask, output_size):
     input_, target = trainer.preprocess(img, mask.long())
@@ -67,7 +81,6 @@ def predict(trainer, dataset, input_size=None, scales=(0.5,),
     for data in tqdm(dataloader, total=len(dataset)):
         img = data[0].to(device)
         mask = data[1].to(device).float()
-
         # original spatial size of input image (height, width)
         orig_size = (img.size(2), img.size(3))
 
@@ -125,11 +138,12 @@ def save_predictions(predictions, dataset, output_dir='predictions'):
 
 
 def infer(trainer, data_dir, output_dir=None, input_size=None,
-          scales=(0.5,), num_workers=4, device='cpu'):
+          scales=(0.5,), num_workers=4, device='cpu', n_classes=2):
     """Making inference on a directory of images with given model checkpoint."""
-
+    #print('Number of classes in infer', n_classes)
     trainer.model.eval()
-    dataset = SegmentationDataset(data_dir, train=False)
+    #check what segmentation dataset does
+    dataset = SegmentationDataset(data_dir, train=False, n_classes=n_classes)
 
     predictions = predict(trainer, dataset, input_size=input_size, scales=scales,
                           num_workers=num_workers, device=device)
@@ -142,7 +156,7 @@ def infer(trainer, data_dir, output_dir=None, input_size=None,
 
 def main(data_dir, model_type='wesup', checkpoint=None, output_dir=None,
          input_size=None, scales=(0.5,), num_workers=4, device=None, **kwargs):
-    
+    #print('Number of classes in main', n_classes)
     if output_dir is None and checkpoint is not None:
         checkpoint = Path(checkpoint)
         output_dir = checkpoint.parent.parent / 'results'
@@ -156,13 +170,12 @@ def main(data_dir, model_type='wesup', checkpoint=None, output_dir=None,
         trainer.load_checkpoint(checkpoint)
 
     infer(trainer, data_dir, output_dir, input_size=input_size,
-          scales=scales, num_workers=num_workers, device=device)
+          scales=scales, num_workers=num_workers, device=device, **kwargs)
 
-
-parser = train.build_cli_parser()
-args = parser.parse_args()
+#copy the cli parser and keep only the things that we need 
 
 if __name__ == '__main__':
-
-    main(data_dir, model_type='wesup', checkpoint=args.checkpoint, output_dir=args.output,
-         input_size=None, scales=(0.5,), num_workers=4, device=None)
+    parser = build_cli_parser()
+    args = parser.parse_args()
+    main(data_dir=args.dataset_path, model_type='wesup', checkpoint=args.checkpoint, output_dir=args.output,
+         input_size=None, scales=(0.5,), num_workers=args.num_workers, device=None, n_classes=args.n_classes)
