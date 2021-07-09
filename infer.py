@@ -10,7 +10,6 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-#import fire
 import argparse
 from tqdm import tqdm
 from PIL import Image
@@ -79,6 +78,7 @@ def predict(trainer, dataset, input_size=None, scales=(0.5,),
     for data in tqdm(dataloader, total=len(dataset)):
         img = data[0].to(device)
         mask = data[1].to(device).float()
+        print('mask size', mask.shape)
         # original spatial size of input image (height, width)
         orig_size = (img.size(2), img.size(3))
 
@@ -136,7 +136,7 @@ def save_predictions(predictions, dataset, output_dir='predictions'):
 
 
 def infer(trainer, data_dir, output_dir=None, input_size=None,
-          scales=(0.5,), num_workers=4, device='cpu', n_classes=2):
+          scales=(0.5,), num_workers=4, device='cpu', n_classes=2, **kwargs):
     """Making inference on a directory of images with given model checkpoint."""
     #print('Number of classes in infer', n_classes)
     trainer.model.eval()
@@ -153,7 +153,7 @@ def infer(trainer, data_dir, output_dir=None, input_size=None,
 
 
 def main(data_dir, model_type='wesup', checkpoint=None, output_dir=None,
-         input_size=None, scales=(0.5,), num_workers=4, device=None, **kwargs):
+         input_size=None, scales=(0.5,), num_workers=4, device=None, n_classes=2):
     #print('Number of classes in main', n_classes)
     if output_dir is None and checkpoint is not None:
         checkpoint = Path(checkpoint)
@@ -163,12 +163,12 @@ def main(data_dir, model_type='wesup', checkpoint=None, output_dir=None,
     
     device = device or ('cuda' if torch.cuda.is_available() else 'cpu')
     
-    trainer = initialize_trainer(model_type, device=device, **kwargs)
+    trainer = initialize_trainer(model_type, device=device, n_classes=n_classes)
     if checkpoint is not None:
         trainer.load_checkpoint(checkpoint)
 
     infer(trainer, data_dir, output_dir, input_size=input_size,
-          scales=scales, num_workers=num_workers, device=device, **kwargs)
+          scales=scales, num_workers=num_workers, device=device, n_classes=n_classes)
 
 #copy the cli parser and keep only the things that we need 
 
