@@ -23,8 +23,8 @@ For this module pass the following arguments:
 
 -k or --checkpoint, for the path to the checkpoint you want to test at
 -o or --output, for the the path to save the predictions in
-
-These are inherited from the train.py file in the build_cli_parser function
+-N or --n_classes if the number of classes is > 2
+-w or --num_workers optionally
 """
 def build_cli_parser():
     parser = argparse.ArgumentParser('Inference Function.')
