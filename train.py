@@ -34,6 +34,8 @@ def build_cli_parser():
      help='Momentum term, a number between 0 and 1')
     parser.add_argument('--swap0', action="store_true",
      help='Swap labels  0 and 1 (amgad dataset)')
+    parser.add_argument('-D', default=32, type=int,
+     help='The dim(0) output of the classifier. Values should be integers that are powers of 2.')
     parser.add_argument('-m', '--multiscale_range', default=None, type=float, nargs='+',
      help='multiscale_range, takes 2 numbers, where the first number passed is less than the second number. Both numbers can be any values between 0 and 1.')
     return parser
@@ -74,6 +76,6 @@ if __name__ == '__main__':
     else:
         weights=None
 
-    fit(args.dataset_path, model= "wesup", class_weights=weights, n_classes=args.n_classes,
+    fit(args.dataset_path, model= "wesup", class_weights=weights, n_classes=args.n_classes, D=args.D,
      epochs=args.epochs, batch_size=args.batch, proportion=args.proportion, checkpoint=args.checkpoint,
      rescale_factor=args.rescale_factor, multiscale_range=args.multiscale_range, momentum=args.momentum,swap0=args.swap0)
