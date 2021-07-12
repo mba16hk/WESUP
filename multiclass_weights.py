@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Script to Calculate weights for multiclass datasets
@@ -18,12 +19,10 @@ Image.MAX_IMAGE_PIXELS = 194221750
 def build_cli_parser():
     parser = argparse.ArgumentParser('Weights Function.')
     parser.add_argument('dataset_path', help='Path to training folder of dataset.')
-    parser.add_argument('-o', '--output', default='weights',
-                        help='Path to calculated weights')
     return parser
 
 
-def calculate_weights(dataset_path,destination_path ,filetype) :
+def calculate_weights(dataset_path, filetype) :
     path=j(dataset_path,"masks","*."+filetype)
     
     #find the number of unique classes in the masks
@@ -48,12 +47,15 @@ def calculate_weights(dataset_path,destination_path ,filetype) :
             x=sum(np.sum(img.astype(int) == i, axis=1))
             n[i]+=x[0]
     
-    print("Total number of pixels belonging to each calculated.")
+    print("There are", imgsize, "pixels in the training dataset.")
     #Equations taken from Crowdsourcing dataset supplementary material
     ratio= [x / imgsize for x in n]
     weights=[1-x for x in ratio]
-    weights[0]=0
-    np.savetxt(j(destination_path,f"weights-{str(base(dirname(dirname(args.dataset_path))))}.csv"), weights, delimiter=',') 
+    if "amgad" in base(dirname(dirname(args.dataset_path))) or "Amgad" in base(dirname(dirname(args.dataset_path))):
+        print("Amgad dataset sets class 0 to weight 0.")
+        weights[0]=0 #Amgad dataset says that the 0 is not ROI data, therefore set class 0 to 0.
+
+    np.savetxt(f"weights-{str(base(dirname(dirname(args.dataset_path))))}.csv", weights, delimiter=',') 
     
 def file_extension(dataset_path) :
     orig_path=j(dataset_path,"masks")
@@ -76,5 +78,5 @@ if __name__ == '__main__':
     
     #determine the filetyoe of images
     filetype=file_extension(args.dataset_path)
-    calculate_weights(args.dataset_path, args.output, filetype)
-    print("Class weights successfully calculated.")
+    calculate_weights(args.dataset_path, filetype)
+    print("Class weights successfully calculated and saved to the main directory.")
