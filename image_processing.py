@@ -14,7 +14,7 @@ import shutil
 import pandas as pd
 from skimage import io
 from sklearn.model_selection import train_test_split
-from skimage.transform import rescale
+from skimage.transform import rescale, resize
 import warnings
 
 
