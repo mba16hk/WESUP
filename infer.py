@@ -26,6 +26,7 @@ For this module pass the following arguments:
 -N or --n_classes if the number of classes is > 2
 -w or --num_workers optionally
 """
+
 def build_cli_parser():
     parser = argparse.ArgumentParser('Inference Function.')
     parser.add_argument('dataset_path',
@@ -38,14 +39,19 @@ def build_cli_parser():
      help='Path to output directory')
     parser.add_argument('-w', '--num_workers', default=4, type=int,
      help='Number of workers in the dataloader, a non-zero integer')
+    parser.add_argument('-S', '--sp_segmentation', default="slic", choices=['slic', 'fz', 'q', 'w'],
+     help='The type of superpixel segmentation algorithm to be used. This can be slic, fz for felzenszwalb, q for quickshift, or w for watershed.')
+    parser.add_argument('-D', default=32, type=int,
+     help='The dim(0) output of the classifier. Values should be integers that are powers of 2.')
+    parser.add_argument('--swap0', action='store_true',
+     help='Swap labels 0 and 1 (amgad dataset)')
     return parser
 
 def predict_single_image(trainer, img, mask, output_size):
     input_, target = trainer.preprocess(img, mask.long())
 
     with torch.no_grad():
-        pred = trainer.model(input_)
-
+        pred = trainer.model(input_) #calls on WESUP(nn.Module in wesup.py, passes input_ as x)
     pred, _ = trainer.postprocess(pred, target)
     pred = pred.float().unsqueeze(0)
     pred = F.interpolate(pred, size=output_size, mode='nearest')
@@ -78,7 +84,7 @@ def predict(trainer, dataset, input_size=None, scales=(0.5,),
     for data in tqdm(dataloader, total=len(dataset)):
         img = data[0].to(device)
         mask = data[1].to(device).float()
-        print('mask size', mask.shape)
+
         # original spatial size of input image (height, width)
         orig_size = (img.size(2), img.size(3))
 
@@ -135,10 +141,9 @@ def save_predictions(predictions, dataset, output_dir='predictions'):
         Image.fromarray(pred * 255).save(output_dir / f'{img_path.stem}.png')
 
 
-def infer(trainer, data_dir, output_dir=None, input_size=None,
-          scales=(0.5,), num_workers=4, device='cpu', n_classes=2, **kwargs):
+def infer(trainer, data_dir, output_dir=None, input_size=None, 
+          scales=(0.5,), num_workers=4, device='cpu', n_classes=2):
     """Making inference on a directory of images with given model checkpoint."""
-    #print('Number of classes in infer', n_classes)
     trainer.model.eval()
     #check what segmentation dataset does
     dataset = SegmentationDataset(data_dir, train=False, n_classes=n_classes)
@@ -152,9 +157,8 @@ def infer(trainer, data_dir, output_dir=None, input_size=None,
     return predictions
 
 
-def main(data_dir, model_type='wesup', checkpoint=None, output_dir=None,
-         input_size=None, scales=(0.5,), num_workers=4, device=None, n_classes=2):
-    #print('Number of classes in main', n_classes)
+def main(data_dir, model_type='wesup', checkpoint=None, output_dir=None, 
+         input_size=None, scales=(0.5,), num_workers=4, device=None, n_classes=2, D=32, **kwargs):
     if output_dir is None and checkpoint is not None:
         checkpoint = Path(checkpoint)
         output_dir = checkpoint.parent.parent / 'results'
@@ -163,7 +167,7 @@ def main(data_dir, model_type='wesup', checkpoint=None, output_dir=None,
     
     device = device or ('cuda' if torch.cuda.is_available() else 'cpu')
     
-    trainer = initialize_trainer(model_type, device=device, n_classes=n_classes)
+    trainer = initialize_trainer(model_type, device=device, n_classes=n_classes, D=D, **kwargs)
     if checkpoint is not None:
         trainer.load_checkpoint(checkpoint)
 
@@ -175,5 +179,6 @@ def main(data_dir, model_type='wesup', checkpoint=None, output_dir=None,
 if __name__ == '__main__':
     parser = build_cli_parser()
     args = parser.parse_args()
-    main(data_dir=args.dataset_path, model_type='wesup', checkpoint=args.checkpoint, output_dir=args.output,
-         input_size=None, scales=(0.5,), num_workers=args.num_workers, device=None, n_classes=args.n_classes)
+    #print(args.swap0)
+    main(data_dir=args.dataset_path, model_type='wesup', checkpoint=args.checkpoint, output_dir=args.output, sp_seg=args.sp_segmentation,
+         input_size=None, scales=(0.5,), num_workers=args.num_workers, device=None, n_classes=args.n_classes, D=args.D)
