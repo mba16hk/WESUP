@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Functions to reduce the size of datasets with big images.
@@ -31,6 +32,8 @@ def build_cli_parser():
      help='Path to output croppped dataset')
     parser.add_argument('-r','--reduce', choices=['t', 'c', 's'],
      help='Type t for tiling, c for cropping, and s for rescaling.')
+    parser.add_argument('-T','--target_pixels', type=int, default=1800,
+     help='The maximum height or width of the image above which image rescaling happens.')
     parser.add_argument('-N','--tile_number', type=int , default = 'None',
      help='If tiling, the image will be chopped into NxN tiles. If cropping, the image will be chopped into NxN pixels. If rescaling, N would be any value greater than 0 and less than or equal to 1.')
     return parser
@@ -42,28 +45,40 @@ def rescale_images(orig_path, dst_path, filetype, N) :
     
     for directory in os.listdir(orig_path) :
         dst_main_dir = j(output_path, directory)    
-        os.mkdir(dst_main_dir)
+        if not os.path.exists(dst_main_dir):
+            os.mkdir(dst_main_dir)
+        
         if os.path.isdir(j(orig_path,directory)) :
             original_path=j(orig_path,directory)
             
-            for path in os.listdir(original_path) :
+        for path in os.listdir(original_path) :
+            if os.path.isdir(j(original_path,path)):
                 dst_sub_dir=j(dst_main_dir,path)
-                os.mkdir(dst_sub_dir)
-                
-                if os.path.isdir(j(original_path,path)):
-                    x='*.'+filetype
-                    for file in glob.glob(j(original_path,path,x)):
-                        im= io.imread(file)
-                        image_rescaled = rescale(im, N, anti_aliasing=False, 
+                if not os.path.exists(dst_sub_dir):
+                    os.mkdir(dst_sub_dir)
+                x='*.'+filetype
+                for file in glob.glob(j(original_path,path,x)):
+                    im= io.imread(file)
+                    image_rescaled = rescale(im, N, anti_aliasing=False, 
                                                  mode='constant', multichannel= True)
-                        filename='resc'+os.path.basename(file)
-                        destination=j(output_path,directory, path, filename)
-                        io.imsave(destination, image_rescaled)
+                    filename='resc'+os.path.basename(file)
+                    destination=j(output_path,directory, path, filename)
+                    io.imsave(destination, image_rescaled)
+            else:
+                for file in glob.glob(j(original_path,path,x)):
+                    im= io.imread(file)
+                    image_rescaled = rescale(im, N, anti_aliasing=False, 
+                                                 mode='constant', multichannel= True)
+                    filename='resc'+os.path.basename(file)
+                    destination=j(output_path,directory, path, filename)
+                    io.imsave(destination, image_rescaled)
                         
-def rescale_image_sep_dir(rsc_dir,file, scale): #rescales an image in a separate directory
+#rescales an image in a separate directory
+def resize_image_sep_dir(rsc_dir,file, scale): 
     im= io.imread(file)
-    rescaled = rescale(im, scale, anti_aliasing=False,
-                       mode='constant', multichannel= True)
+    scale=round(1/scale)
+    rescaled = resize(im, (im.shape[0]//scale, im.shape[1]//scale), 
+                      anti_aliasing=True, mode='constant')
     filename='resc'+os.path.basename(file)
     destination=j(rsc_dir, filename)
     io.imsave(destination, rescaled)
@@ -71,6 +86,35 @@ def rescale_image_sep_dir(rsc_dir,file, scale): #rescales an image in a separate
     
     return rs_im
 
+#scales and tiles the images based on the input params
+def scale_and_tile(target_pixels,file, dst_main_dir,filetype, N):
+    im=Image.open(file)
+    w, h = im.size
+    resc_img_dir= j(dst_main_dir,'rescaled_images')
+    if not os.path.exists(resc_img_dir):
+        os.mkdir(resc_img_dir)
+    if w>target_pixels or h>target_pixels:
+        w_adjuster=target_pixels/w
+        h_adjuster=target_pixels/h
+        scale=(w_adjuster+h_adjuster)/2
+        rs_im = resize_image_sep_dir(resc_img_dir, file, scale)
+    else:
+        rs_im=file
+        
+    if N==0 :
+        im=Image.open(rs_im)
+        w, h = im.size   
+        Nw=round(w/650)
+        Nh=round(h/650)
+        tiles=image_slicer.slice(rs_im,row=Nh,
+                                     col=Nw,save= False)
+    else :
+        tiles=image_slicer.slice(rs_im,row=N,
+                                     col=N,save= False)
+            
+    return tiles
+
+#crops images to correct sizes
 def crop_images(orig_path, dst_path, filetype, N):
     output_path=j(dirname(dirname(orig_path)),dst_path)
     if not os.path.exists(output_path):
@@ -78,102 +122,109 @@ def crop_images(orig_path, dst_path, filetype, N):
     
     for directory in os.listdir(orig_path) :
         dst_main_dir = j(output_path, directory)    
-        os.mkdir(dst_main_dir)
+        if not os.path.exists(dst_main_dir):
+            os.mkdir(dst_main_dir)
         
         if os.path.isdir(j(orig_path,directory)) :
             original_path=j(orig_path,directory)
-            
-            for path in os.listdir(original_path) :
-                dst_sub_dir=j(dst_main_dir,path)
-                os.mkdir(dst_sub_dir)
-                
-                if os.path.isdir(j(original_path,path)):
-                    x='*.'+filetype
-                    for file in glob.glob(j(original_path,path,x)):
-                        im=Image.open(file)
-                        w, h = im.size
-                        change_w=w-N
-                        change_h=h-N
-                        if (change_w%2==0) :
-                            x=(change_w/2)
-                            diff_w=np.repeat(x,2)
-                        else :
-                            x=((change_w+1)/2)
-                            diff_w=[x,x-1]
 
-                        if (change_h%2==0) :
-                            x=(change_h/2)
-                            diff_h=np.repeat(x,2)
-                        else :
-                            x=((change_h+1)/2)
-                            diff_h=[x,x-1]
-                        cropped_image=im.crop((diff_w[0], diff_h[0], 
-                                               w-diff_w[1], h-diff_h[1]))
-                        filename=os.path.basename(file)
-                        destination=j(output_path,directory, path, filename)
-                        cropped_image.save(destination, filetype)
-   
-def tile_images(orig_path, dst_path, filetype, N) :
+        for path in os.listdir(original_path) :
+
+            if os.path.isdir(j(original_path,path)):
+                dst_sub_dir=j(dst_main_dir,path)
+                if not os.path.exists(dst_sub_dir):
+                    os.mkdir(dst_sub_dir)
+                x='*.'+filetype
+                for file in glob.glob(j(original_path,path,x)):
+                    im=Image.open(file)
+                    w, h = im.size
+                    change_w=w-N
+                    change_h=h-N
+                    if (change_w%2==0) :
+                        x=(change_w/2)
+                        diff_w=np.repeat(x,2)
+                    else :
+                        x=((change_w+1)/2)
+                        diff_w=[x,x-1]
+
+                    if (change_h%2==0) :
+                        x=(change_h/2)
+                        diff_h=np.repeat(x,2)
+                    else :
+                        x=((change_h+1)/2)
+                        diff_h=[x,x-1]
+                    cropped_image=im.crop((diff_w[0], diff_h[0], 
+                                           w-diff_w[1], h-diff_h[1]))
+                    filename=os.path.basename(file)
+                    destination=j(output_path,directory, path, filename)
+                    cropped_image.save(destination, filetype)
+            else:
+                for file in glob.glob(j(original_path,path)):
+                    im=Image.open(file)
+                    w, h = im.size
+                    change_w=w-N
+                    change_h=h-N
+                    if (change_w%2==0) :
+                        x=(change_w/2)
+                        diff_w=np.repeat(x,2)
+                    else :
+                        x=((change_w+1)/2)
+                        diff_w=[x,x-1]
+
+                    if (change_h%2==0) :
+                        x=(change_h/2)
+                        diff_h=np.repeat(x,2)
+                    else :
+                        x=((change_h+1)/2)
+                        diff_h=[x,x-1]
+                    cropped_image=im.crop((diff_w[0], diff_h[0], 
+                                           w-diff_w[1], h-diff_h[1]))
+                    filename=os.path.basename(file)
+                    destination=j(output_path,directory, path, filename)
+                    cropped_image.save(destination, filetype)
+
+#Tiling function with uses scale_and_tile and resize_img_sep_dir   
+def tile_images(orig_path, dst_path, filetype, N, target_pixels) :
     output_path=j(dirname(dirname(orig_path)),dst_path)
     if not os.path.exists(output_path):
         os.mkdir(output_path)
         
-    for directory in os.listdir(orig_path) :
-        dst_main_dir = j(output_path, directory)    
-        os.mkdir(dst_main_dir)
+    for directory in os.listdir(orig_path):
+        dst_main_dir = j(output_path, directory)
+        if not os.path.exists(dst_main_dir):
+            os.mkdir(dst_main_dir)
         
         if os.path.isdir(j(orig_path,directory)) :
             original_path=j(orig_path,directory)
             
-            for path in os.listdir(original_path) :
+        for path in os.listdir(original_path) :
+            if os.path.isdir(j(original_path,path)):
                 dst_sub_dir=j(dst_main_dir,path)
-                os.mkdir(dst_sub_dir)
+                if not os.path.exists(dst_sub_dir):
+                    os.mkdir(dst_sub_dir)
+                x='*.'+filetype
+                for file in glob.glob(j(original_path,path,x)):
+                    tiles=scale_and_tile(target_pixels,file, dst_sub_dir, filetype, N)
+                    filename=split(os.path.basename(file))
+                    output_prefix="sl_" + filename[0]
+                    destination=j(dst_sub_dir)
+                    image_slicer.save_tiles(tiles, directory=destination, 
+                                            prefix=output_prefix, format=filetype)
+                    if os.path.exists(j(dst_sub_dir,"rescaled_images")):
+                        shutil.rmtree(j(dst_sub_dir,"rescaled_images"), ignore_errors=True)
+            else:
+                for file in glob.glob(j(original_path,path)):
+                    tiles=scale_and_tile(target_pixels,file, dst_main_dir, filetype, N)
+                    filename=split(os.path.basename(file))
+                    output_prefix="sl_" + filename[0]
+                    destination=j(dst_main_dir)
+                    image_slicer.save_tiles(tiles, directory=destination, 
+                                            prefix=output_prefix, format=filetype) 
                 
-                if os.path.isdir(j(original_path,path)):
-                    x='*.'+filetype
-                    for file in glob.glob(j(original_path,path,x)):
-                        im=Image.open(file)
-                        w, h = im.size
-                        resc_img_dir= j(dst_sub_dir,'rescaled_images')
-                        if not os.path.exists(resc_img_dir):
-                            os.mkdir(resc_img_dir)
-                        if (w*h)>(80*10**6) :
-                            scale= 0.38
-                            rs_im = rescale_image_sep_dir(resc_img_dir,file, scale) 
-                        elif (w*h)>(45*10**6) and (w*h)<=(80*10**6):
-                            scale= 0.48
-                            rs_im = rescale_image_sep_dir(resc_img_dir,file, scale)
-                        elif (w*h)>(25*10**6) and (w*h)<=(45*10**6) :
-                            scale= 0.58
-                            rs_im = rescale_image_sep_dir(resc_img_dir,file, scale)
-                        elif (w*h)>(10*10**6) and (w*h)<=(25*10**6) :
-                            scale= 0.68
-                            rs_im = rescale_image_sep_dir(resc_img_dir,file, scale)
-                        else :
-                            scale=1
-                            rs_im=file
-                            
-                        if N==0 :
-                            im=Image.open(rs_im)
-                            w, h = im.size   
-                            Nw=round(w/650)
-                            Nh=round(h/650)
-                            tiles=image_slicer.slice(rs_im,row=Nh,
-                                                     col=Nw,save= False)
-                        else :
-                            tiles=image_slicer.slice(rs_im,row=N,
-                                                     col=N,save= False)
-                            
-                        filename=split(os.path.basename(file))
-                        output_prefix="sl_"+filename[0]
-                        destination=j(output_path,directory, path)
-                        image_slicer.save_tiles(tiles, directory=destination, 
-                                                prefix=output_prefix, format=filetype) 
+                if os.path.exists(j(dst_main_dir,"rescaled_images")):
+                    shutil.rmtree(j(dst_main_dir,"rescaled_images"), ignore_errors=True)
                         
-                    if os.path.exists(resc_img_dir):
-                        shutil.rmtree(resc_img_dir, ignore_errors=True)
-                        
-                        
+# Function that determines the file extension of the images in the dataset                        
 def file_extension(orig_path) :
     ListFiles = os.walk(orig_path)
     SplitTypes = []
@@ -197,7 +248,7 @@ if __name__ == '__main__':
     filetype=file_extension(args.dataset_path)
     
     if args.reduce == 't' :
-        tile_images(args.dataset_path, args.output, filetype, args.tile_number)
+        tile_images(args.dataset_path, args.output, filetype, args.tile_number, args.target_pixels)
         print('Finished Tiling Dataset. Tiled dataset is ready.')
     elif args.reduce == 'c' :
         crop_images(args.dataset_path, args.output, filetype, args.tile_number)
