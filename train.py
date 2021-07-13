@@ -36,7 +36,7 @@ def build_cli_parser():
      help='Swap labels  0 and 1 (amgad dataset)')
     parser.add_argument('-D', default=32, type=int,
      help='The dim(0) output of the classifier. Values should be integers that are powers of 2.')
-    parser.add_argument('-S', '--sp_segmentation', default="slic", type=str,
+    parser.add_argument('-S', '--sp_segmentation', default="slic", choices=['slic', 'fz', 'q', 'w'],
      help='The type of superpixel segmentation algorithm to be used. This can be slic, fz for felzenszwalb, q for quickshift, or w for watershed.')
     parser.add_argument('-m', '--multiscale_range', default=None, type=float, nargs='+',
      help='multiscale_range, takes 2 numbers, where the first number passed is less than the second number. Both numbers can be any values between 0 and 1.')
