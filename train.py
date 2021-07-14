@@ -5,8 +5,8 @@ Training module.
 import logging
 from shutil import rmtree
 
-from utils.metrics import accuracy
-from utils.metrics import dice
+from utils.metrics import accuracy, iou
+from utils.metrics import dice, hausdorff
 import argparse
 import csv
 import torch
@@ -61,8 +61,11 @@ def fit(dataset_path, model='wesup', **kwargs):
     trainer = models.initialize_trainer(model, logger=logger, **kwargs)
 
     try:
-        trainer.train(dataset_path,
-                      metrics=[accuracy, dice], **kwargs)
+        if kwargs.get('n_classes')>2:
+            #print("The number of classes is:",kwargs.get('n_classes'))
+            trainer.train(dataset_path, metrics=[accuracy, dice, hausdorff, iou], **kwargs)
+        else:
+            trainer.train(dataset_path, metrics=[accuracy, dice, hausdorff], **kwargs)
     finally:
         if kwargs.get('smoke'):
             rmtree(trainer.record_dir, ignore_errors=True)
