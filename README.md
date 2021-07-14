@@ -34,12 +34,13 @@ data_glas
 
 ### Colorectal Adenocarcinoma Gland (CRAG) dataset
 
-Download the dataset from this [link](https://warwick.ac.uk/fac/sci/dcs/research/tia/data/mildnet/). Then organize this dataset like GlaS mentioned above.
+Download the dataset from this [link](https://warwick.ac.uk/fac/sci/dcs/research/tia/data/mildnet/). Then organize this dataset like GlaS mentioned above. An additional script `prepare_crag.py` has been created for that reason. It is to be used on the unzipped CRAG folder.
 
 ### Generating point labels
+Point labels are generated to simulate the weak supervision scenario. If the point labels are not present, WESUP will not enter the weak supervision mode. The `generate_point.py` script will create a folder called "points" in the the training folder of the prepared dataset.
 
 ```bash
-$ python scripts/generate_points.py /path/to/dataset -p 1e-4
+$ python scripts/generate_points.py /path/to/training/dataset -p 1e-4
 ```
 
 > The `-p` or `--label-percent` argument is for controlling the percentage of labeled pixels. Larger value means stronger supervision.
@@ -69,13 +70,15 @@ $ python train.py /path/to/dataset --epochs 100
 
 ### Resume training from a checkpoint
 
+The path to the checkpoint of interest will be in the `RECORDS` directory.
+
 ```bash
 $ python train.py /path/to/dataset --epochs 100 --checkpoint /path/to/checkpoint
 ```
 
 ### Recording multple runs
 
-By default, each run will be stored within a timestamped directory within `records`. The structure of a record directory is as follows:
+By default, each run will be stored within a timestamped directory within `RECORDS`. The structure of a record directory is as follows:
 
 ```
 records/20190423-1122-AM
