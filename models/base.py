@@ -361,6 +361,6 @@ class BaseTrainer(ABC):
 
         for P, G in iterable:
             for func in self.metric_funcs:
-                metrics[func.__name__].append(func(P, G))
+                metrics[func.__name__].append(func(P, G, n_classes=self.kwargs.get('n_classes')))
 
         return {k: np.mean(v) for k, v in metrics.items()}
