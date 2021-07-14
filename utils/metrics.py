@@ -14,11 +14,11 @@ from scipy.spatial.distance import directed_hausdorff
 from skimage.measure import label
 
 
-def convert_to_numpy(func):
+def convert_to_numpy(func, n_classes=2):
     """Decorator for converting each argument to numpy array."""
 
     @functools.wraps(func)
-    def wrapper(*args):
+    def wrapper(*args, n_classes=2):
         args = [
             arg.detach().cpu().numpy() if torch.is_tensor(arg) else np.array(arg)
             for arg in args
@@ -28,7 +28,7 @@ def convert_to_numpy(func):
     return wrapper
 
 
-def accuracy(P, G):
+def accuracy(P, G, n_classes=2):
     """Classification accuracy.
 
     Arguments:
@@ -109,7 +109,7 @@ def detection_f1(S, G, overlap_threshold=0.5, epsilon=1e-7):
     return (2*precision*recall) / (precision + recall + epsilon)
 
 
-def dice(S, G, epsilon=1e-7):
+def dice(S, G, n_classes=2, epsilon=1e-7):
     """Dice index for segmentation evaluation.
 
     Arguments:
@@ -120,18 +120,27 @@ def dice(S, G, epsilon=1e-7):
     Returns:
         dice_score: segmentation dice score
     """
-
     if torch.is_tensor(S) and torch.is_tensor(G):
         S = S.unsqueeze(0) if len(S.size()) == 2 else S
         G = G.unsqueeze(0) if len(G.size()) == 2 else G
         S, G = S.float(), G.float()
-        dice_score = 2 * (G * S).sum(dim=(1, 2)) / (G.sum(dim=(1, 2)) + S.sum(dim=(1, 2)) + epsilon)
-        return dice_score.mean().item()
+        if n_classes==2:
+            dice_score = 2 * (G * S).sum(dim=(1, 2)) / (G.sum(dim=(1, 2)) + S.sum(dim=(1, 2)) + epsilon)
+        else:
+            a,b,c=G.shape
+            dice_score = 2*(S == G).sum()/(2 * b * c + epsilon)
 
+        return dice_score.mean().item()
+    
     S, G = np.array(S), np.array(G)
     S = np.expand_dims(S, 0) if len(S.shape) == 2 else S
     G = np.expand_dims(G, 0) if len(G.shape) == 2 else G
-    dice_score = 2 * (G * S).sum(axis=(1, 2)) / (G.sum(axis=(1, 2)) + S.sum(axis=(1, 2)) + epsilon)
+    if n_classes==2:
+        dice_score = 2 * (G * S).sum(dim=(1, 2)) / (G.sum(dim=(1, 2)) + S.sum(dim=(1, 2)) + epsilon)
+    else:
+        a,b,c=G.shape
+        dice_score = 2*(S == G).sum()/(2 * b * c + epsilon)
+
     return dice_score.mean()
 
 
@@ -196,7 +205,7 @@ def object_dice(S, G):
 
 
 @convert_to_numpy
-def hausdorff(S, G):
+def hausdorff(S, G, n_classes=2):
     """Symmetric hausdorff distance for shape similarity evaluation.
 
     Arguments:
@@ -279,3 +288,25 @@ def object_hausdorff(S, G):
             tilde_hausdorff_sum += tilde_omegai * min_distance
 
     return (hausdorff_sum + tilde_hausdorff_sum) / 2
+
+@convert_to_numpy       
+def iou(S, G, epsilon=1e-7, n_classes=2):
+    """
+    Script to compute the IOU score for multi-class data
+    Adapted from: https://www.kaggle.com/iezepov/fast-iou-scoring-metric-in-pytorch-and-numpy
+    """
+    S = S.unsqueeze(0)
+    G = G.unsqueeze(0)
+
+    if torch.is_tensor(S) and torch.is_tensor(G):
+        intersection = (S & G).sum((1, 2))
+        union = (S | G).sum((1, 2))
+        iou = (intersection + epsilon) / (union + epsilon)
+        thresholded = np.ceil(np.clip(20 * (iou - 0.5), 0, 10)) / 10
+    else:
+        intersection = (S & G).float().sum((1, 2))  # Will be zero if Truth=0 or Prediction=0
+        union = (S | G).float().sum((1, 2))         # Will be zero if both are 0
+        iou = (intersection + epsilon) / (union + epsilon)  # We smooth our division to avoid 0/0
+        thresholded = torch.clamp(20 * (iou - 0.5), 0, 10).ceil() / 10  # This is equal to comparing with thresolds
+    
+    return thresholded  # Or thresholded.mean()
