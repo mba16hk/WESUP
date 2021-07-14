@@ -39,7 +39,7 @@ def build_cli_parser():
     return parser
 
 def rescale_images(orig_path, dst_path, filetype, N) :
-    output_path=j(dirname(dirname(orig_path)),dst_path)
+    output_path=dst_path
     if not os.path.exists(output_path):
         os.mkdir(output_path)
     
@@ -116,7 +116,7 @@ def scale_and_tile(target_pixels,file, dst_main_dir,filetype, N):
 
 #crops images to correct sizes
 def crop_images(orig_path, dst_path, filetype, N):
-    output_path=j(dirname(dirname(orig_path)),dst_path)
+    output_path=dst_path
     if not os.path.exists(output_path):
         os.mkdir(output_path)
     
@@ -185,7 +185,7 @@ def crop_images(orig_path, dst_path, filetype, N):
 
 #Tiling function with uses scale_and_tile and resize_img_sep_dir   
 def tile_images(orig_path, dst_path, filetype, N, target_pixels) :
-    output_path=j(dirname(dirname(orig_path)),dst_path)
+    output_path=dst_path
     if not os.path.exists(output_path):
         os.mkdir(output_path)
         
@@ -242,8 +242,8 @@ if __name__ == '__main__':
     parser = build_cli_parser()
     args = parser.parse_args()
     
-    if not os.path.exists(j(dirname(dirname(args.dataset_path)),args.output)) :
-        os.mkdir(j(dirname(dirname(args.dataset_path)),args.output))
+    if not os.path.exists(args.output) :
+        os.mkdir(args.output)
     
     filetype=file_extension(args.dataset_path)
     
