@@ -62,10 +62,11 @@ def fit(dataset_path, model='wesup', **kwargs):
 
     try:
         if kwargs.get('n_classes')>2:
-            #print("The number of classes is:",kwargs.get('n_classes'))
-            trainer.train(dataset_path, metrics=[accuracy, dice, hausdorff, iou], **kwargs)
+            #iou calculated for multiclass data
+            trainer.train(dataset_path, metrics=[accuracy, dice, iou], **kwargs)
         else:
-            trainer.train(dataset_path, metrics=[accuracy, dice, hausdorff], **kwargs)
+            #iou not calculated for binary data
+            trainer.train(dataset_path, metrics=[accuracy, dice], **kwargs)
     finally:
         if kwargs.get('smoke'):
             rmtree(trainer.record_dir, ignore_errors=True)
