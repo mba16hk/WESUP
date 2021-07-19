@@ -487,9 +487,9 @@ class WESUPTrainer(BaseTrainer):
         else:
             raise ValueError('Invalid input data for WESUP')
 
-        #print("image shape:",img.shape)
         # if img.shape[0]>1:
         #     for i in range(0,img.shape[0]):
+
         if self.kwargs.get('sp_seg') =='slic':
             segments = slic(
             img.squeeze().cpu().numpy().transpose(1, 2, 0),
@@ -509,14 +509,17 @@ class WESUPTrainer(BaseTrainer):
 
         elif self.kwargs.get('sp_seg') =='q':
 
-            segments_= quickshift(img.squeeze().cpu().numpy().transpose(1, 2, 0), kernel_size=3, max_dist=6, ratio=0.5)
-            #print('quickshift segments size and shape', segments.shape, segments)
+            quickshift_image = img
+            quickshift_image = quickshift_image.type(torch.DoubleTensor)
+            segments = quickshift(quickshift_image.squeeze().cpu().numpy().transpose(1, 2, 0),
+             kernel_size=3, max_dist=6, ratio=0.5)
+
+            print('quickshift segments size and shape', segments.shape, segments)
 
         elif self.kwargs.get('sp_seg') =='w':
-
             gradient = sobel(rgb2gray(img.squeeze().cpu().numpy().transpose(1, 2, 0)))
-            segments = watershed(gradient, markers=250, compactness=0.001)
-            #print('quickshift segments size and shape', segments.shape, segments)
+            segments = watershed(gradient, markers=500, compactness=0.01)
+            print('watershed segments size and shape', segments.shape, segments)
 
 
         segments = torch.as_tensor(
@@ -524,7 +527,6 @@ class WESUPTrainer(BaseTrainer):
 
         if point_mask is not None and not is_empty_tensor(point_mask):
             mask = point_mask.squeeze()
-            #print('point mask')
         elif pixel_mask is not None and not is_empty_tensor(pixel_mask):
             mask = pixel_mask.squeeze()
             #print('pixel mask', mask.sum(1).sum(1))
