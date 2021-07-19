@@ -120,6 +120,7 @@ def dice(S, G, n_classes=2, epsilon=1e-7):
     Returns:
         dice_score: segmentation dice score
     """
+
     if torch.is_tensor(S) and torch.is_tensor(G):
         S = S.unsqueeze(0) if len(S.size()) == 2 else S
         G = G.unsqueeze(0) if len(G.size()) == 2 else G
@@ -127,8 +128,20 @@ def dice(S, G, n_classes=2, epsilon=1e-7):
         if n_classes==2:
             dice_score = 2 * (G * S).sum(dim=(1, 2)) / (G.sum(dim=(1, 2)) + S.sum(dim=(1, 2)) + epsilon)
         else:
-            a,b,c=G.shape
-            dice_score = 2*(S == G).sum()/(2 * b * c + epsilon)
+            #Calculation of the generalised dice loss (GDL) score
+            block, row, col = G.shape
+            numerator = 0
+            denominator = 0
+            for i in range(n_classes):
+                S_labels = (S == i)
+                G_labels = (G == i)
+                intersection_lab = np.logical_and(S_labels.cpu(), G_labels.cpu()).sum()
+                union = (2*row*col) - intersection_lab
+                alpha = 1/(union**2)
+                numerator += (alpha*intersection_lab)
+                denominator += (alpha*union)
+            GDL = numerator/denominator
+            return GDL
 
         return dice_score.mean().item()
     
@@ -138,8 +151,19 @@ def dice(S, G, n_classes=2, epsilon=1e-7):
     if n_classes==2:
         dice_score = 2 * (G * S).sum(dim=(1, 2)) / (G.sum(dim=(1, 2)) + S.sum(dim=(1, 2)) + epsilon)
     else:
-        a,b,c=G.shape
-        dice_score = 2*(S == G).sum()/(2 * b * c + epsilon)
+        block, row, col = G.shape
+        numerator = 0
+        denominator = 0
+        for i in range(n_classes):
+            S_labels = (S == i)
+            G_labels = (G == i)
+            intersection_lab = np.logical_and(S_labels.cpu, G_labels.cpu).sum()
+            union = (2*row*col) - intersection_lab
+            alpha = 1/(union**2)
+            numerator += (alpha*intersection_lab)
+            denominator += (alpha*union)
+        GDL = numerator/denominator
+        return GDL
 
     return dice_score.mean()
 
@@ -288,25 +312,44 @@ def object_hausdorff(S, G):
             tilde_hausdorff_sum += tilde_omegai * min_distance
 
     return (hausdorff_sum + tilde_hausdorff_sum) / 2
-
-@convert_to_numpy       
+    
 def iou(S, G, epsilon=1e-7, n_classes=2):
+
+    """Intersection over Union similarity evaluation.
+
+    Arguments:
+        S: segmentation mask with shape (H, W)
+        G: ground truth mask with shape (H, W)
+        n_classes : The number of classes in the masks
+
+    Returns:
+        iou.mean(): the mean iou score for the computed classes
     """
-    Script to compute the IOU score for multi-class data
-    Adapted from: https://www.kaggle.com/iezepov/fast-iou-scoring-metric-in-pytorch-and-numpy
-    """
-    S = S.unsqueeze(0)
-    G = G.unsqueeze(0)
 
     if torch.is_tensor(S) and torch.is_tensor(G):
-        intersection = (S & G).sum((1, 2))
-        union = (S | G).sum((1, 2))
-        iou = (intersection + epsilon) / (union + epsilon)
-        thresholded = np.ceil(np.clip(20 * (iou - 0.5), 0, 10)) / 10
+        intersection=[0]*n_classes
+        union=[0]*n_classes
+        for i in range(n_classes):
+            # Find occurrences of each class
+            S_labels = (S == i)
+            G_labels = (G == i)
+
+            # Find the intersection between the predicted and the actual
+            intersect = np.logical_and(S_labels.cpu(), G_labels.cpu()).sum() 
+            intersection[i] = intersect.item() #converts to integer
+            union_of_data = ((2*(S_labels.sum() + G_labels.sum())) - intersection[i])
+            union[i] = union_of_data.item() + epsilon
+        iou = np.array(intersection)/np.array(union)
+
     else:
-        intersection = (S & G).float().sum((1, 2))  # Will be zero if Truth=0 or Prediction=0
-        union = (S | G).float().sum((1, 2))         # Will be zero if both are 0
-        iou = (intersection + epsilon) / (union + epsilon)  # We smooth our division to avoid 0/0
-        thresholded = torch.clamp(20 * (iou - 0.5), 0, 10).ceil() / 10  # This is equal to comparing with thresolds
+        intersection=[0]*n_classes
+        union=[0]*n_classes
+        for i in range(n_classes):
+            S_labels = (S == i)
+            G_labels = (G == i)
+            intersect = np.logical_and(S_labels.cpu(), G_labels.cpu()).sum() 
+            intersection[i] = intersect.item() #converts to integer
+            union[i] = ((2*(S_labels.sum() + G_labels.sum())) - intersection[i]) + epsilon
+        iou = np.array(intersection)/np.array(union)
     
-    return thresholded  # Or thresholded.mean()
+    return iou.mean()
