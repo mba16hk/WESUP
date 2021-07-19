@@ -53,6 +53,7 @@ def predict_single_image(trainer, img, mask, output_size):
     with torch.no_grad():
         pred = trainer.model(input_) #calls on WESUP(nn.Module in wesup.py, passes input_ as x)
     pred, _ = trainer.postprocess(pred, target)
+    print(pred.min(),pred.max(), pred.shape)
     pred = pred.float().unsqueeze(0)
     pred = F.interpolate(pred, size=output_size, mode='nearest')
 
