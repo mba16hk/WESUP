@@ -5,6 +5,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch_lr_finder import LRFinder
 from torchvision import models
 from skimage.filters import sobel
 from skimage.color import rgb2gray
@@ -49,7 +50,6 @@ def _preprocess_superpixels(segments, mask=None, epsilon=1e-7):
        
         # quantize superpixel labels (e.g., from (0.7, 0.3) to (1.0, 0.0))
         sp_labels = sp_labels[labeled_sps]
-        #print('sp_labels unique1', sp_labels.sum(0))
         sp_labels = (sp_labels == sp_labels.max(
             dim=-1, keepdim=True)[0]).float() #This is a 1 hot encoded vector of sp (finding the maximum)
         #print('sp_labels unique2', sp_labels.sum(0))
@@ -171,6 +171,7 @@ class WESUPConfig(BaseConfig):
     # Optimization parameters.
     momentum = 0.9
     weight_decay = 0.001
+    lr = 5e-5
 
     # Whether to freeze backbone.
     freeze_backbone = False
@@ -305,15 +306,15 @@ class WESUP(nn.Module):
         for sp_idx in range(sp_maps.max().item() + 1):
             pred[sp_maps == sp_idx] = self.sp_pred[sp_idx]
 
+        # Code for multi-class classification
         if self.n_classes==2:
+            # for binary masks
             pred=pred.unsqueeze(0)[..., 1]
-            #print('2 classes')
         else:
+            # for multi-class masks
             vals, indicies=pred.max(2)
             pred= indicies.unsqueeze(0)
-            #print('n classes')
-            
-        #print('unique pred wesup', torch.unique(pred))
+
         return pred
 
 
@@ -368,7 +369,7 @@ class WESUPPixelInference(WESUP):
             nn.Linear(D, n_classes),
             nn.Softmax(dim=1)
         )
-        #print('No of classes in wesup.py 3',n_classes)
+
         # store conv feature maps
         self.feature_maps = None
 
@@ -430,6 +431,7 @@ class WESUPTrainer(BaseTrainer):
             propagate_weight: weight for label-propagated samples in loss function
             momentum: SGD momentum
             weight_decay: weight decay for optimizer
+            lr: learning rate for optimizer
             freeze_backbone: whether to freeze backbone
 
         Returns:
@@ -464,7 +466,7 @@ class WESUPTrainer(BaseTrainer):
     def get_default_optimizer(self):
         optimizer = torch.optim.SGD(
             filter(lambda p: p.requires_grad, self.model.parameters()),
-            lr=5e-5,
+            lr=self.kwargs.get('lr'),
             momentum=self.kwargs.get('momentum'),
             weight_decay=self.kwargs.get('weight_decay'),
         )
@@ -472,6 +474,11 @@ class WESUPTrainer(BaseTrainer):
             optimizer, 'min', patience=10, factor=0.5, min_lr=1e-5, verbose=True)
 
         return optimizer, None
+    
+    def LR_finder(self, optimizer):
+        optimizer, _ = get_default_optimizer(self)
+        criterion = nn.CrossEntropyLoss()
+        lr_finder = LRFinder(self.model, optimizer, criterion, device=self.device)
 
     def preprocess(self, *data):
         data = [datum.to(self.device) for datum in data]
@@ -501,11 +508,11 @@ class WESUPTrainer(BaseTrainer):
             #print('slic segments', np.unique(segments))
 
         elif self.kwargs.get('sp_seg') =='fz':
-
+            
             segments = felzenszwalb(img.squeeze().cpu().numpy().transpose(1, 2, 0), 
             scale=20, sigma=0.8, min_size=30)
             
-            print('fz segments', segments.shape)
+            #print('fz segments', segments.shape, len(np.unique(segments)))
 
         elif self.kwargs.get('sp_seg') =='q':
 
@@ -514,12 +521,14 @@ class WESUPTrainer(BaseTrainer):
             segments = quickshift(quickshift_image.squeeze().cpu().numpy().transpose(1, 2, 0),
              kernel_size=3, max_dist=6, ratio=0.5)
 
-            print('quickshift segments size and shape', segments.shape, segments)
+            #print('quickshift segments size and shape', segments.shape, len(np.unique(segments)))
 
         elif self.kwargs.get('sp_seg') =='w':
+            # Not working, throws ValueError: loss is nan
             gradient = sobel(rgb2gray(img.squeeze().cpu().numpy().transpose(1, 2, 0)))
-            segments = watershed(gradient, markers=500, compactness=0.01)
-            print('watershed segments size and shape', segments.shape, segments)
+            segments = watershed(gradient, markers=500, compactness=0.001)
+
+            #print('watershed segments size and shape', segments.shape, len(np.unique(segments)))
 
 
         segments = torch.as_tensor(
@@ -540,11 +549,12 @@ class WESUPTrainer(BaseTrainer):
 
     def compute_loss(self, pred, target, metrics=None):
         _, sp_labels = target
-        #print(sp_labels)
-        #print(sp_labels.shape)
+        
+        
 
         sp_features = self.model.sp_features
         sp_pred = self.model.sp_pred
+        print(sp_pred.shape)
 
         if sp_pred is None:
             raise RuntimeError(
@@ -575,9 +585,9 @@ class WESUPTrainer(BaseTrainer):
                 if self.kwargs.get('enable_propagation'):
                     metrics['propagated_labels'] = propagated_labels.sum().item()
                     metrics['propagate_loss'] = propagate_loss.item()
-            #print("weakly supervised")
+            print("weakly supervised")
         else:  # fully-supervised mode
-            #print("fully supervised")
+            print("fully supervised")
             loss = self.xentropy(sp_pred, sp_labels)
 
 
