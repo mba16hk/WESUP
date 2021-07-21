@@ -5,6 +5,7 @@ Utilities for recording multiple runs of experiments.
 import os
 import glob
 import json
+import torch
 from shutil import copyfile, copytree, rmtree
 from sklearn.metrics import confusion_matrix
 from datetime import datetime
@@ -110,38 +111,29 @@ def plot_learning_curves(history_path):
         plt.savefig(curves_dir / f'{key}.png')
         plt.close()
 
-def plot_confusion_matrix(history_path, S, G, n_classes, normalize=False,  cmap=None):
+def plot_confusion_matrix(record_dir, cm, n_classes, normalize=False,  cmap=None):
 
     """Confusion matrix plotting.
 
     Arguments:
-        S: segmentation mask with shape (H, W)
-        G: ground truth mask with shape (H, W)
+        record_dir: Directory where the confusion matrix will be saved
+        cm : The confusion matrix
         n_classes : The number of classes in the masks
 
     Citation: http://scikit-learn.org/stable/auto_examples/model_selection/plot_confusion_matrix.html
 
     """
-    history = pd.read_csv(history_path)
-    record_dir = history_path.parent
-    curves_dir = record_dir / 'curves'
-    if not curves_dir.exists():
-        curves_dir.mkdir()
-
-    cm = confusion_matrix(G, S)
-    target_names = list(range(n_classes+1))
-    title = 'Confusion matrix'
-
+    target_names = list(range(n_classes))
     accuracy = np.trace(cm) / np.sum(cm).astype('float')
     misclass = 1 - accuracy
 
     if cmap is None:
         cmap = plt.get_cmap('Blues')
 
-    plt.figure(figsize=(8, 6))
+    plt.figure()
     plt.imshow(cm, interpolation='nearest', cmap=cmap)
-    plt.title(title)
-    plt.colorbar()
+    plt.title('Confusion matrix')
+    #plt.colorbar(cm,fraction=0.046, pad=0.04)
 
     if target_names is not None:
         tick_marks = np.arange(len(target_names))
@@ -167,4 +159,4 @@ def plot_confusion_matrix(history_path, S, G, n_classes, normalize=False,  cmap=
     plt.tight_layout()
     plt.ylabel('True label')
     plt.xlabel('Predicted label\naccuracy={:0.4f}; misclass={:0.4f}'.format(accuracy, misclass))
-    plt.savefig(curves_dir / 'Confusion_Matrix.png')
+    plt.savefig(record_dir / 'Confusion_Matrix.pdf')

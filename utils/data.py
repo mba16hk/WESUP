@@ -61,13 +61,11 @@ class SegmentationDataset(Dataset):
 
         # path to original images
         self.img_paths = sorted((self.root_dir / 'images').iterdir())
-        #print(self.img_paths)
 
         # path to mask annotations (optional)
         self.mask_paths = None
         if (self.root_dir / 'masks').exists():
             self.mask_paths = sorted((self.root_dir / 'masks').iterdir())
-        #print(self.mask_paths)
 
         self.mode = mode or 'mask' if self.mask_paths is not None else None
 
@@ -98,7 +96,6 @@ class SegmentationDataset(Dataset):
 
     def _resize_image_and_mask(self, img, mask=None):
         height, width = img.shape[:2]
-        #print("BEFORE", "rescale factor:", self.rescale_factor, "height:", height, "width", width)
         if self.target_size is not None:
             target_height, target_width = self.target_size
             #print("1")
@@ -111,20 +108,14 @@ class SegmentationDataset(Dataset):
             #Scales down the height and width by the allocated rescale factor
             target_height = int(np.ceil(self.rescale_factor * height))
             target_width = int(np.ceil(self.rescale_factor * width))
-            #print("3")
         else:
             #Keep the heights and widths the same as the raw input image
             target_height, target_width = height, width
-
-        #print("AFTER", "rescale factor:", self.rescale_factor, "height:", target_height, "width", target_width)
         img = resize_img(img, (target_height, target_width))
-        #print("resize_img:", img.shape)
 
         # pixel-level annotation mask
         if mask is not None:
             mask = resize_mask(mask, (target_height, target_width))
-
-        #print("resize_mask:", mask.shape)
 
         return img, mask
 
@@ -148,14 +139,16 @@ class SegmentationDataset(Dataset):
         return augmented['image'], augmented.get('mask', None)
 
     def _convert_image_and_mask_to_tensor(self, img, mask):
-        #print("BEFORE   mask:",mask.shape, "image:", img.shape)
         img = TF.to_tensor(img)
         if mask is not None:
             if self.contour:
                 cont = dilation(find_boundaries(mask))
-            mask = np.concatenate([np.expand_dims(mask == i, 0)
-                                   for i in range(self.n_classes)])
+
+            #One hot encoding of the mask
+            mask=[np.expand_dims(mask == i, 0) for i in range(self.n_classes)]
+            mask = np.concatenate(mask)
             mask = torch.as_tensor(mask.astype('int64'), dtype=torch.long)
+            
         else:
             mask = empty_tensor
 
@@ -164,7 +157,7 @@ class SegmentationDataset(Dataset):
                                    for i in range(self.n_classes)])
             cont = torch.as_tensor(cont.astype('int64'), dtype=torch.long)
             return img, mask, cont
-        #print("mask:",mask.shape, "image:", img.shape)
+
         return img, mask
 
     def __getitem__(self, idx):
@@ -173,18 +166,30 @@ class SegmentationDataset(Dataset):
         mask = None
         if self.mask_paths is not None:
             mask = imread(str(self.mask_paths[idx]))
-            #print(np.unique(mask))
-            #Collapse all classes > 1 into a single label for testing purposes
-            mask[mask>2]=3
-            
-            # if self.swap0:
-            #     #The background should be 0 and the ROI>0
-            #     mask1=(mask==1)
-            #     mask0=(mask==0)
-            #     mask[mask0]=1
-            #     mask[mask1]=0
+
+            #Collapse all classes > the provided n_classes into 0 (testing purposes)
+            if len(np.unique(mask))>(self.n_classes-1):
+                mask[mask>(self.n_classes-1)]=0
 
             #print("mask",np.unique(mask))
+        
+            #Collapse all classes > 1 into a single label for testing purposes
+            
+            #if self.swap0:
+                #The background should be 0 and the ROI>0
+            # mask3=(mask==3)
+            # mask2=(mask==2)
+            # mask1=(mask==1)
+            
+            # mask[mask1]=0
+            # mask[mask2]=1
+            # mask[mask3]=2
+
+            # mask1=(mask==1)
+            # mask0=(mask==0)
+            # mask[mask0]=1
+            # mask[mask1]=0
+
         img, mask = self._resize_image_and_mask(img, mask)
 
         if self.train:
