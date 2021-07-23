@@ -12,7 +12,6 @@ from tqdm import tqdm
 
 from utils import underline, record
 from utils.history import HistoryTracker
-#print("CPU Count",os.cpu_count())
 
 class BaseConfig:
     """A base model configuration class."""
@@ -188,11 +187,8 @@ class BaseTrainer(ABC):
             phase: either 'train' or 'val'
             *data: input data
         """
-
         input_, target = self.preprocess(*data)
-        #print("input_ shape", input_.shape)
-        #print("target shape", target.shape)
-
+       
         self.optimizer.zero_grad()
         metrics = dict()
 
@@ -200,6 +196,7 @@ class BaseTrainer(ABC):
             pred = self.model(input_)
             if phase == 'train':
                 loss = self.compute_loss(pred, target, metrics=metrics)
+                #print('loss', loss)
 
                 if torch.isnan(loss):
                     raise ValueError('Loss is nan!')
@@ -212,6 +209,7 @@ class BaseTrainer(ABC):
 
         pred, target = self.postprocess(pred, target)
         self.tracker.step({**metrics, **self.evaluate(pred, target)})
+        
         del pred, target
         gc.collect()
         torch.cuda.empty_cache()
@@ -289,6 +287,7 @@ class BaseTrainer(ABC):
         val_path = data_root / 'val'
         train_dataset = self.get_default_dataset(train_path,
                                                  proportion=self.kwargs.get('proportion', 1))
+        
         train_dataset.summary(logger=self.logger)
 
         self.dataloaders = {
@@ -297,6 +296,7 @@ class BaseTrainer(ABC):
                 batch_size=self.kwargs.get('batch_size'),
                 shuffle=True, num_workers=os.cpu_count())
         }
+        #print('train_dataset', self.dataloaders)
 
         if val_path.exists():
             val_dataset = self.get_default_dataset(val_path, train=False)
