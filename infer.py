@@ -14,6 +14,7 @@ import argparse
 from tqdm import tqdm
 from PIL import Image
 from skimage.morphology import opening
+from sklearn.metrics import confusion_matrix
 
 from models import initialize_trainer
 from utils.data import SegmentationDataset
@@ -39,6 +40,8 @@ def build_cli_parser():
      help='Path to output directory')
     parser.add_argument('-w', '--num_workers', default=4, type=int,
      help='Number of workers in the dataloader, a non-zero integer')
+    parser.add_argument('-M', '--conf_matrix', default="F", choices=['T', 'F'],
+     help='A flag to specify if the user wants a confusion matrix.')
     parser.add_argument('-S', '--sp_segmentation', default="slic", choices=['slic', 'fz', 'q', 'w'],
      help='The type of superpixel segmentation algorithm to be used. This can be slic, fz for felzenszwalb, q for quickshift, or w for watershed.')
     parser.add_argument('-D', default=32, type=int,
@@ -53,15 +56,17 @@ def predict_single_image(trainer, img, mask, output_size):
     with torch.no_grad():
         pred = trainer.model(input_) #calls on WESUP(nn.Module in wesup.py, passes input_ as x)
     pred, _ = trainer.postprocess(pred, target)
-    print(pred.min(),pred.max(), pred.shape)
+    pred_desired = pred
+    tensor1, tensor2 = target
+    tensor1 = tensor1.squeeze(0)
     pred = pred.float().unsqueeze(0)
     pred = F.interpolate(pred, size=output_size, mode='nearest')
 
-    return pred
+    return pred, tensor1, pred_desired
 
 
 def predict(trainer, dataset, input_size=None, scales=(0.5,),
-            num_workers=4, device='cpu'):
+            num_workers=4, device='cpu', n_classes = 2, ConfMat = "T"):
     """Predict on a directory of images.
 
     Arguments:
@@ -80,7 +85,7 @@ def predict(trainer, dataset, input_size=None, scales=(0.5,),
 
     size_info = f'input size {input_size}' if input_size else f'scales {scales}'
     print(f'\nPredicting {len(dataset)} images with {size_info} ...')
-
+    CM_tot = np.zeros((n_classes,n_classes), dtype=int)
     predictions = []
     for data in tqdm(dataloader, total=len(dataset)):
         img = data[0].to(device)
@@ -92,17 +97,27 @@ def predict(trainer, dataset, input_size=None, scales=(0.5,),
         if input_size is not None:
             img = F.interpolate(img, size=input_size, mode='bilinear')
             mask = F.interpolate(mask, size=input_size, mode='nearest')
-            prediction = predict_single_image(trainer, img, mask, orig_size)
+            
+            prediction, target, pred_orig = predict_single_image(trainer, img, mask, orig_size)
+        
         else:
             multiscale_preds = []
             for scale in scales:
                 target_size = [ceil(size * scale) for size in orig_size]
                 img = F.interpolate(img, size=target_size, mode='bilinear')
                 mask = F.interpolate(mask, size=target_size, mode='nearest')
-                multiscale_preds.append(
-                    predict_single_image(trainer, img, mask, orig_size))
+                pred, target, pred_orig = predict_single_image(trainer, img, mask, orig_size)
+                multiscale_preds.append(pred)
 
             prediction = torch.cat(multiscale_preds).mean(dim=0).round()
+
+        if ConfMat == "T":
+            G = torch.flatten(target[1].cpu())
+            S = torch.flatten(pred_orig.squeeze(0).cpu())
+            cm = confusion_matrix(G, S)
+            if cm.shape == (n_classes, n_classes):
+                CM_tot += cm
+        
 
         prediction = prediction.squeeze().cpu().numpy()
 
@@ -119,7 +134,7 @@ def predict(trainer, dataset, input_size=None, scales=(0.5,),
 
         predictions.append(prediction)
 
-    return predictions
+    return predictions, CM_tot
 
 
 def save_predictions(predictions, dataset, output_dir='predictions'):
@@ -143,22 +158,72 @@ def save_predictions(predictions, dataset, output_dir='predictions'):
 
 
 def infer(trainer, data_dir, output_dir=None, input_size=None, 
-          scales=(0.5,), num_workers=4, device='cpu', n_classes=2):
+          scales=(0.5,), num_workers=4, device='cpu', n_classes=2, ConfMat = "T"):
     """Making inference on a directory of images with given model checkpoint."""
     trainer.model.eval()
     #check what segmentation dataset does
     dataset = SegmentationDataset(data_dir, train=False, n_classes=n_classes)
-
-    predictions = predict(trainer, dataset, input_size=input_size, scales=scales,
-                          num_workers=num_workers, device=device)
+    predictions, CM = predict(trainer, dataset, input_size=input_size, scales=scales,
+                          num_workers=num_workers, device=device, n_classes = n_classes,
+                          ConfMat = ConfMat)
 
     if output_dir is not None:
         save_predictions(predictions, dataset, output_dir)
+        if ConfMat == "T":
+            plot_confusion_matrix(output_dir, CM, n_classes)
 
     return predictions
 
+def plot_confusion_matrix(output_dir, cm, n_classes, normalize=False,  cmap=None):
 
-def main(data_dir, model_type='wesup', checkpoint=None, output_dir=None, 
+    """Confusion matrix plotting.
+
+    Arguments:
+        output_dir: Directory where the confusion matrix will be saved
+        cm : The confusion matrix
+        n_classes : The number of classes in the masks
+
+    Citation: http://scikit-learn.org/stable/auto_examples/model_selection/plot_confusion_matrix.html
+
+    """
+    target_names = list(range(n_classes))
+    accuracy = np.trace(cm) / np.sum(cm).astype('float')
+    misclass = 1 - accuracy
+
+    if cmap is None:
+        cmap = plt.get_cmap('Blues')
+
+    #plt.figure()
+    plt.imshow(cm, interpolation='nearest', cmap=cmap)
+    plt.title('Confusion matrix')
+
+    if target_names is not None:
+        tick_marks = np.arange(len(target_names))
+        plt.xticks(tick_marks, target_names, rotation=0)
+        plt.yticks(tick_marks, target_names)
+
+    if normalize:
+        cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+
+    thresh = cm.max() / 1.5 if normalize else cm.max() / 2
+    for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+        if normalize:
+            plt.text(j, i, "{:0.4f}".format(cm[i, j]),
+                     horizontalalignment="center",
+                     color="white" if cm[i, j] > thresh else "black")
+        else:
+            plt.text(j, i, "{:,}".format(cm[i, j]),
+                     horizontalalignment="center",
+                     color="white" if cm[i, j] > thresh else "black")
+
+
+    plt.tight_layout()
+    plt.ylabel('True label')
+    plt.xlabel('Predicted label\naccuracy={:0.4f}; misclass={:0.4f}'.format(accuracy, misclass))
+    plt.savefig(output_dir / 'Confusion_Matrix.pdf')
+
+
+def main(data_dir, model_type='wesup', checkpoint=None, output_dir=None, ConfMat = "T",
          input_size=None, scales=(0.5,), num_workers=4, device=None, n_classes=2, D=32, **kwargs):
     if output_dir is None and checkpoint is not None:
         checkpoint = Path(checkpoint)
@@ -172,7 +237,7 @@ def main(data_dir, model_type='wesup', checkpoint=None, output_dir=None,
     if checkpoint is not None:
         trainer.load_checkpoint(checkpoint)
 
-    infer(trainer, data_dir, output_dir, input_size=input_size,
+    infer(trainer, data_dir, output_dir, input_size=input_size, ConfMat = ConfMat,
           scales=scales, num_workers=num_workers, device=device, n_classes=n_classes)
 
 #copy the cli parser and keep only the things that we need 
@@ -180,6 +245,5 @@ def main(data_dir, model_type='wesup', checkpoint=None, output_dir=None,
 if __name__ == '__main__':
     parser = build_cli_parser()
     args = parser.parse_args()
-    #print(args.swap0)
     main(data_dir=args.dataset_path, model_type='wesup', checkpoint=args.checkpoint, output_dir=args.output, sp_seg=args.sp_segmentation,
-         input_size=None, scales=(0.5,), num_workers=args.num_workers, device=None, n_classes=args.n_classes, D=args.D)
+         input_size=None, scales=(0.5,), num_workers=args.num_workers, device=None, n_classes=args.n_classes, D=args.D, ConfMat = args.conf_matrix)
