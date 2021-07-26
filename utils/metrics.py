@@ -135,8 +135,12 @@ def dice(S, G, n_classes=2, epsilon=1e-7):
             for i in range(n_classes):
                 S_labels = (S == i)
                 G_labels = (G == i)
-                intersection_lab = np.logical_and(S_labels.cpu(), G_labels.cpu()).sum()
-                union = (2*row*col) - intersection_lab
+                intersection_lab = np.logical_and(S_labels.cpu(), G_labels.cpu()).sum().item()
+                #union = (2*row*col) - intersection_lab
+                if G_labels.sum() == 0:
+                    union = (2*row*col)
+                else:
+                    union = G_labels.sum().item()
                 alpha = 1/(union**2)
                 numerator += (alpha*intersection_lab)
                 denominator += (alpha*union)
@@ -157,8 +161,12 @@ def dice(S, G, n_classes=2, epsilon=1e-7):
         for i in range(n_classes):
             S_labels = (S == i)
             G_labels = (G == i)
-            intersection_lab = np.logical_and(S_labels.cpu, G_labels.cpu).sum()
-            union = (2*row*col) - intersection_lab
+            intersection_lab = np.logical_and(S_labels.cpu(), G_labels.cpu()).sum().item()
+            #union = (2*row*col) - intersection_lab
+            if G_labels.sum() == 0:
+                union = (2*row*col)
+            else:
+                union = G_labels.sum().item()
             alpha = 1/(union**2)
             numerator += (alpha*intersection_lab)
             denominator += (alpha*union)
@@ -166,7 +174,6 @@ def dice(S, G, n_classes=2, epsilon=1e-7):
         return GDL
 
     return dice_score.mean()
-
 
 @convert_to_numpy
 def object_dice(S, G):
