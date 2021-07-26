@@ -8,6 +8,7 @@ from pathlib import Path
 
 import numpy as np
 import torch
+import os
 import torch.nn.functional as F
 
 import argparse
@@ -15,6 +16,8 @@ from tqdm import tqdm
 from PIL import Image
 from skimage.morphology import opening
 from sklearn.metrics import confusion_matrix
+import matplotlib.pyplot as plt
+import itertools
 
 from models import initialize_trainer
 from utils.data import SegmentationDataset
@@ -26,7 +29,10 @@ For this module pass the following arguments:
 -o or --output, for the the path to save the predictions in
 -N or --n_classes if the number of classes is > 2
 -w or --num_workers optionally
+-M or --conf_matrix as a flag to speicify if a confusion matrix should be made or not
 """
+
+j = os.path.join
 
 def build_cli_parser():
     parser = argparse.ArgumentParser('Inference Function.')
@@ -137,7 +143,7 @@ def predict(trainer, dataset, input_size=None, scales=(0.5,),
     return predictions, CM_tot
 
 
-def save_predictions(predictions, dataset, output_dir='predictions'):
+def save_predictions(predictions, dataset, output_dir='predictions', n_classes = 2):
     """Save predictions to disk.
 
     Args:
@@ -154,7 +160,11 @@ def save_predictions(predictions, dataset, output_dir='predictions'):
 
     for pred, img_path in tqdm(zip(predictions, dataset.img_paths), total=len(predictions)):
         pred = pred.astype('uint8')
-        Image.fromarray(pred * 255).save(output_dir / f'{img_path.stem}.png')
+        if n_classes ==2 :
+            Image.fromarray(pred * 255).save(output_dir / f'{img_path.stem}.png')
+        else:
+            #outputs multiclass predictions as low contrast masks with original classes, post-processing required
+            Image.fromarray(pred).save(output_dir / f'{img_path.stem}.png')
 
 
 def infer(trainer, data_dir, output_dir=None, input_size=None, 
@@ -168,7 +178,7 @@ def infer(trainer, data_dir, output_dir=None, input_size=None,
                           ConfMat = ConfMat)
 
     if output_dir is not None:
-        save_predictions(predictions, dataset, output_dir)
+        save_predictions(predictions, dataset, output_dir, n_classes=n_classes)
         if ConfMat == "T":
             plot_confusion_matrix(output_dir, CM, n_classes)
 
@@ -195,8 +205,7 @@ def plot_confusion_matrix(output_dir, cm, n_classes, normalize=False,  cmap=None
 
     #plt.figure()
     plt.imshow(cm, interpolation='nearest', cmap=cmap)
-    plt.title('Confusion matrix')
-
+    
     if target_names is not None:
         tick_marks = np.arange(len(target_names))
         plt.xticks(tick_marks, target_names, rotation=0)
@@ -216,11 +225,12 @@ def plot_confusion_matrix(output_dir, cm, n_classes, normalize=False,  cmap=None
                      horizontalalignment="center",
                      color="white" if cm[i, j] > thresh else "black")
 
-
-    plt.tight_layout()
+    # cbar = plt.colorbar(boundaries=np.linspace(0,1,5))
+    # cbar.ax.set_title("")
     plt.ylabel('True label')
-    plt.xlabel('Predicted label\naccuracy={:0.4f}; misclass={:0.4f}'.format(accuracy, misclass))
-    plt.savefig(output_dir / 'Confusion_Matrix.pdf')
+    plt.title('Confusion Matrix\nAccuracy={:0.4f}; Misclass={:0.4f}'.format(accuracy, misclass))
+    plt.xlabel('Predicted label')
+    plt.savefig('Confusion_Matrix.pdf')
 
 
 def main(data_dir, model_type='wesup', checkpoint=None, output_dir=None, ConfMat = "T",
