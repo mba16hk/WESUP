@@ -196,7 +196,6 @@ class BaseTrainer(ABC):
             pred = self.model(input_)
             if phase == 'train':
                 loss = self.compute_loss(pred, target, metrics=metrics)
-                #print('loss', loss)
 
                 if torch.isnan(loss):
                     raise ValueError('Loss is nan!')
