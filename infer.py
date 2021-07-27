@@ -184,7 +184,7 @@ def infer(trainer, data_dir, output_dir=None, input_size=None,
 
     return predictions
 
-def plot_confusion_matrix(output_dir, cm, n_classes, normalize=False,  cmap=None):
+def plot_confusion_matrix(output_dir, cm, n_classes, normalize=True,  cmap=None):
 
     """Confusion matrix plotting.
 
@@ -230,7 +230,9 @@ def plot_confusion_matrix(output_dir, cm, n_classes, normalize=False,  cmap=None
     plt.ylabel('True label')
     plt.title('Confusion Matrix\nAccuracy={:0.4f}; Misclass={:0.4f}'.format(accuracy, misclass))
     plt.xlabel('Predicted label')
-    plt.savefig('Confusion_Matrix.pdf')
+    destination = os.path.abspath(output_dir)
+    output_image = f'CM_{os.path.basename(output_dir)}.pdf'
+    plt.savefig(destination+"/"+output_image)
 
 
 def main(data_dir, model_type='wesup', checkpoint=None, output_dir=None, ConfMat = "T",
