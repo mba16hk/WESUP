@@ -40,7 +40,7 @@ class SegmentationDataset(Dataset):
     """
 
     def __init__(self, root_dir, mode=None, contour=False, target_size=None, rescale_factor=None,
-                 multiscale_range=None, train=True, proportion=1, n_classes=2, seed=0, swap0=False):
+                 multiscale_range=None, train=True, proportion=1, n_classes=2, seed=0):
         """Initialize a new SegmentationDataset.
 
         Args:
@@ -54,7 +54,6 @@ class SegmentationDataset(Dataset):
             proportion: proportion of data to be used (between 0 and 1) 
             n_classes: number of target classes
             seed: random seed
-            swap0: Swap mask labels 0 and 1 (for strange amgad labelling)
         """
         
         self.root_dir = Path(root_dir).expanduser()
@@ -79,9 +78,8 @@ class SegmentationDataset(Dataset):
         self.train = train
         self.proportion = proportion
         self.n_classes = n_classes
-        #print('classes in segdataset', n_classes)
+        print('segdataset', self.n_classes)
         self.multiscale_range = multiscale_range
-        self.swap0 = swap0
 
         # indexes to pick image/mask from
         self.picked = np.arange(len(self.img_paths))
@@ -98,12 +96,10 @@ class SegmentationDataset(Dataset):
         height, width = img.shape[:2]
         if self.target_size is not None:
             target_height, target_width = self.target_size
-            #print("1")
         elif self.multiscale_range is not None:
             self.rescale_factor = np.random.uniform(*self.multiscale_range)
             target_height = int(np.ceil(self.rescale_factor * height))
             target_width = int(np.ceil(self.rescale_factor * width))
-            #print("2")
         elif self.rescale_factor is not None:
             #Scales down the height and width by the allocated rescale factor
             target_height = int(np.ceil(self.rescale_factor * height))
@@ -144,7 +140,7 @@ class SegmentationDataset(Dataset):
             if self.contour:
                 cont = dilation(find_boundaries(mask))
 
-            #One hot encoding of the mask
+            # One hot encoding of the mask
             mask=[np.expand_dims(mask == i, 0) for i in range(self.n_classes)]
             mask = np.concatenate(mask)
             mask = torch.as_tensor(mask.astype('int64'), dtype=torch.long)
@@ -171,8 +167,7 @@ class SegmentationDataset(Dataset):
             if len(np.unique(mask))>(self.n_classes-1):
                 mask[mask>(self.n_classes-1)]=0
 
-            #print("mask",np.unique(mask))
-        
+            #print("unique masks point", len(np.unique(mask)))
             #Collapse all classes > 1 into a single label for testing purposes
             
             #if self.swap0:
@@ -321,9 +316,9 @@ class PointSupervisionDataset(SegmentationDataset):
     """
 
     def __init__(self, root_dir, target_size=None, rescale_factor=None,
-                 multiscale_range=None, radius=0, train=True, proportion=1):
+                 multiscale_range=None, radius=0, train=True, proportion=1, n_classes = 2):
         super().__init__(root_dir, mode='point', target_size=target_size,
-                         rescale_factor=rescale_factor, train=train,
+                         rescale_factor=rescale_factor, train=train, n_classes = n_classes,
                          proportion=proportion, multiscale_range=multiscale_range)
 
         # path to point supervision directory
@@ -451,17 +446,17 @@ class Digest2019PointDataset(SegmentationDataset):
     """
 
     def __init__(self, root_dir, target_size=None, rescale_factor=None,
-                 multiscale_range=None, radius=0, train=True, proportion=1):
+                 multiscale_range=None, radius=0, train=True, proportion=1, **kwargs):
         super().__init__(root_dir, mode='point', target_size=target_size,
                          rescale_factor=rescale_factor, train=train,
-                         proportion=proportion, multiscale_range=multiscale_range)
+                         proportion=proportion, multiscale_range=multiscale_range, **kwargs)
 
         # path to point supervision directory
         self.point_root = self.root_dir / 'points'
 
         # path to point annotation files
         self.point_paths = sorted(self.point_root.glob('*.csv'))
-
+        print('digest2019', self.n_classes)
         self.radius = radius
 
     def _augment(self, *data):
@@ -496,7 +491,7 @@ class Digest2019PointDataset(SegmentationDataset):
         img_path = self.img_paths[idx]
         img = imread(str(img_path))
         is_negative = img_path.name.startswith('negative')
-
+        
         pixel_mask = None
         if self.mask_paths is not None:
             pixel_mask = imread(str(self.mask_paths[idx]))
@@ -527,6 +522,19 @@ class Digest2019PointDataset(SegmentationDataset):
         if self.train:
             img, pixel_mask, points = self._augment(img, pixel_mask, points)
 
+        unique_points = []
+        for i in range(len(points)):
+            vector_tuple = list(points[i])
+            unique_points.append(vector_tuple[2])
+        unique_points = np.unique(unique_points)
+
+        if self.n_classes < len(np.unique(unique_points)):
+            for i in range(len(points)):
+              vector_tuple = list(points[i])
+              if vector_tuple[2] > self.n_classes:
+                  vector_tuple[2] = 0
+              points [i] = tuple(vector_tuple)
+
         img, pixel_mask = self._convert_image_and_mask_to_tensor(
             img, pixel_mask)
 
@@ -536,6 +544,9 @@ class Digest2019PointDataset(SegmentationDataset):
             point_mask = np.zeros(
                 (self.n_classes, *img.shape[-2:]), dtype='uint8')
             for x, y, class_ in points:
+                #might be problematic 
+                if class_ == self.n_classes:
+                    class_ = class_ - 1
                 cv2.circle(point_mask[class_], (x, y), self.radius, 1, -1)
 
             if point_mask is not None:
