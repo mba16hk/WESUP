@@ -136,11 +136,7 @@ def dice(S, G, n_classes=2, epsilon=1e-7):
                 S_labels = (S == i)
                 G_labels = (G == i)
                 intersection_lab = np.logical_and(S_labels.cpu(), G_labels.cpu()).sum().item()
-                #union = (2*row*col) - intersection_lab
-                if G_labels.sum() == 0:
-                    union = (2*row*col)
-                else:
-                    union = G_labels.sum().item()
+                union = G_labels.sum().item() + S_labels.sum().item() - intersection_lab
                 alpha = 1/(union**2)
                 numerator += (alpha*intersection_lab)
                 denominator += (alpha*union)
@@ -162,11 +158,7 @@ def dice(S, G, n_classes=2, epsilon=1e-7):
             S_labels = (S == i)
             G_labels = (G == i)
             intersection_lab = np.logical_and(S_labels.cpu(), G_labels.cpu()).sum().item()
-            #union = (2*row*col) - intersection_lab
-            if G_labels.sum() == 0:
-                union = (2*row*col)
-            else:
-                union = G_labels.sum().item()
+            union = G_labels.sum().item() + S_labels.sum().item() - intersection_lab
             alpha = 1/(union**2)
             numerator += (alpha*intersection_lab)
             denominator += (alpha*union)
