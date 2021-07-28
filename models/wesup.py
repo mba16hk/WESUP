@@ -30,18 +30,17 @@ def _preprocess_superpixels(segments, mask=None, epsilon=1e-7):
     """
     # ordering of superpixels
     sp_idx_list = segments.unique()
-    #print('mask unique', mask.shape, segments.shape)
-    if mask is not None and not is_empty_tensor(mask) :#and (torch.max(mask)>0):
+    if mask is not None and not is_empty_tensor(mask) :
         def compute_superpixel_label(sp_idx):
-            sp_mask = (mask * (segments == sp_idx).long()).float()
-            return sp_mask.sum(dim=(1, 2)) / (sp_mask.sum() + epsilon)
+            sp_mask = (mask * (segments == sp_idx).long()).float() 
+            labs = sp_mask.sum(dim=(1, 2)) / (sp_mask.sum() + epsilon)
+            return labs
 
         # compute labels for each superpixel
         sp_labels = torch.cat([
             compute_superpixel_label(sp_idx).unsqueeze(0)
             for sp_idx in range(segments.max() + 1)
         ])
-        #print('sp_labels unique0', sp_labels.shape, sp_labels.sum(0), sp_labels)
 
         # move labeled superpixels to the front of `sp_idx_list`
         labeled_sps = (sp_labels.sum(dim=-1) > 0).nonzero().flatten()
@@ -51,8 +50,8 @@ def _preprocess_superpixels(segments, mask=None, epsilon=1e-7):
         # quantize superpixel labels (e.g., from (0.7, 0.3) to (1.0, 0.0))
         sp_labels = sp_labels[labeled_sps]
         sp_labels = (sp_labels == sp_labels.max(
-            dim=-1, keepdim=True)[0]).float() #This is a 1 hot encoded vector of sp (finding the maximum)
-        #print('sp_labels unique2', sp_labels.sum(0))
+            dim=-1, keepdim=True)[0]).float() # This is a 1 hot encoded vector of sp (finding the maximum)
+
     else:  # no supervision provided
         sp_labels = empty_tensor().to(segments.device)
 
@@ -92,7 +91,6 @@ def _cross_entropy(y_hat, y_true, class_weights=None, epsilon=1e-7):
     ce = -y_true * torch.log(y_hat)
     if class_weights is not None:
         ce = ce * class_weights
-        #ce = ce * class_weights.unsqueeze(0).float()
         
     return torch.sum(ce) / labeled_samples
 
@@ -156,8 +154,8 @@ class WESUPConfig(BaseConfig):
     class_weights= None
 
     # Superpixel parameters.
-    sp_area = 150 #200
-    sp_compactness = 60 #40
+    sp_area = 160
+    sp_compactness = 30 
 
     # whether to enable label propagation
     enable_propagation = True
@@ -233,7 +231,6 @@ class WESUP(nn.Module):
             nn.Linear(D, n_classes), #applies a linear transformation on incoming dataset
             nn.Softmax(dim=1) #normalise across the first dimension (each channel has a prob dist for belonging to each class)
         )
-        #print('No of classes in wesup.py 2',n_classes)
         # store conv feature maps
         self.feature_maps = None
 
@@ -453,6 +450,7 @@ class WESUPTrainer(BaseTrainer):
                 #Enters this only if a points directory exists
                 return Digest2019PointDataset(root_dir, proportion=proportion, 
                                               multiscale_range=self.kwargs.get('multiscale_range'),
+                                              n_classes=self.kwargs.get('n_classes'),
                                               rescale_factor=self.kwargs.get('rescale_factor'))
             return SegmentationDataset(root_dir, proportion=proportion,
                                        multiscale_range=self.kwargs.get('multiscale_range'),
@@ -474,11 +472,6 @@ class WESUPTrainer(BaseTrainer):
             optimizer, 'min', patience=10, factor=0.5, min_lr=1e-5, verbose=True)
 
         return optimizer, None
-    
-    def LR_finder(self, optimizer):
-        optimizer, _ = get_default_optimizer(self)
-        criterion = nn.CrossEntropyLoss()
-        lr_finder = LRFinder(self.model, optimizer, criterion, device=self.device)
 
     def preprocess(self, *data):
         data = [datum.to(self.device) for datum in data]
@@ -502,33 +495,26 @@ class WESUPTrainer(BaseTrainer):
             img.squeeze().cpu().numpy().transpose(1, 2, 0),
             n_segments=int(img.size(-2) * img.size(-1) /
                            self.kwargs.get('sp_area')),
-            compactness=self.kwargs.get('sp_compactness')#,sigma = 0.3
+            compactness=self.kwargs.get('sp_compactness'),
+            sigma = 1
             )
-
-            #print('slic segments', np.unique(segments))
 
         elif self.kwargs.get('sp_seg') =='fz':
             
             segments = felzenszwalb(img.squeeze().cpu().numpy().transpose(1, 2, 0), 
-            scale=20, sigma=0.8, min_size=30)
-            
-            #print('fz segments', segments.shape, len(np.unique(segments)))
+            scale=150, sigma=0.8, min_size=40)
 
         elif self.kwargs.get('sp_seg') =='q':
 
             quickshift_image = img
             quickshift_image = quickshift_image.type(torch.DoubleTensor)
             segments = quickshift(quickshift_image.squeeze().cpu().numpy().transpose(1, 2, 0),
-             kernel_size=3, max_dist=6, ratio=0.5)
-
-            #print('quickshift segments size and shape', segments.shape, len(np.unique(segments)))
+             kernel_size=4, max_dist=100, ratio=0.9)
 
         elif self.kwargs.get('sp_seg') =='w':
             # Not working, throws ValueError: loss is nan
             gradient = sobel(rgb2gray(img.squeeze().cpu().numpy().transpose(1, 2, 0)))
             segments = watershed(gradient, markers=500, compactness=0.001)
-
-            #print('watershed segments size and shape', segments.shape, len(np.unique(segments)))
 
 
         segments = torch.as_tensor(
@@ -538,7 +524,6 @@ class WESUPTrainer(BaseTrainer):
             mask = point_mask.squeeze()
         elif pixel_mask is not None and not is_empty_tensor(pixel_mask):
             mask = pixel_mask.squeeze()
-            #print('pixel mask', mask.sum(1).sum(1))
         else:
             mask = None
 
@@ -554,7 +539,7 @@ class WESUPTrainer(BaseTrainer):
 
         sp_features = self.model.sp_features
         sp_pred = self.model.sp_pred
-        print(sp_pred.shape)
+        #print(sp_pred.shape)
 
         if sp_pred is None:
             raise RuntimeError(
@@ -562,11 +547,9 @@ class WESUPTrainer(BaseTrainer):
 
         # total number of superpixels
         total_num = sp_pred.size(0)
-        print('tot superpixels',total_num)
 
         # number of labeled superpixels
         labeled_num = sp_labels.size(0) #number of rows
-        print('labeled_superpixels',labeled_num)
 
         if labeled_num < total_num:
             # weakly-supervised mode
@@ -585,9 +568,7 @@ class WESUPTrainer(BaseTrainer):
                 if self.kwargs.get('enable_propagation'):
                     metrics['propagated_labels'] = propagated_labels.sum().item()
                     metrics['propagate_loss'] = propagate_loss.item()
-            print("weakly supervised")
         else:  # fully-supervised mode
-            print("fully supervised")
             loss = self.xentropy(sp_pred, sp_labels)
 
 
