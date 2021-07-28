@@ -32,8 +32,6 @@ def build_cli_parser():
      help='Rescaling Factor, a number between 0 and 1')
     parser.add_argument('--momentum', default=0.9, type=float,
      help='Momentum term, a number between 0 and 1')
-    parser.add_argument('--swap0', action="store_true",
-     help='Swap labels  0 and 1 (amgad dataset)')
     parser.add_argument('--lr', default=5e-5, type=float,
      help='Learning rate. Any value between 0 and 1.')
     parser.add_argument('--wd', default=0.001, type=float,
@@ -99,4 +97,4 @@ if __name__ == '__main__':
     fit(args.dataset_path, model= "wesup", class_weights=weights, n_classes=args.n_classes,
      D=args.D, sp_seg=args.sp_segmentation, weight_decay = args.wd, epochs=args.epochs, 
      batch_size=args.batch, proportion=args.proportion, checkpoint=args.checkpoint, lr = args.lr,
-     rescale_factor=args.rescale_factor, multiscale_range=args.multiscale_range, momentum=args.momentum,swap0=args.swap0)
+     rescale_factor=args.rescale_factor, multiscale_range=args.multiscale_range, momentum=args.momentum)
