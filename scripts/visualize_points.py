@@ -6,6 +6,7 @@ import argparse
 import csv
 import os
 import os.path as osp
+import numpy as np
 
 import cv2
 from tqdm import tqdm
@@ -13,10 +14,29 @@ from skimage.io import imread, imsave
 from skimage.segmentation import mark_boundaries
 from joblib import Parallel, delayed
 
-
 COLORS = (
     (0, 255, 0),
     (255, 0, 0),
+    (0, 0, 255), 
+    (227,207,87),
+    (102,205,170),
+    (152,245,255),
+    (255,97,3),
+    (104,34,139),
+    (255,20,147),
+    (24,116,205),
+    (89,89,89),
+    (238,99,99),
+    (238,162,173),
+    (192,255,62),
+    (78,238,148),
+    (74,112,139),
+    (238,92,66),
+    (255,255,0),
+    (255,0,255),
+    (255,246,143),
+    (238,44,44),
+    (0,191,255)
 )
 
 
@@ -56,6 +76,7 @@ def para_func(img_name):
 
     for point in csvreader:
         point = [int(d) for d in point]
+        #arguments of cv2.circle(img, centre_coords, circle_radius, circle colour, thickness)
         cv2.circle(img, (point[0], point[1]), args.radius, COLORS[point[2]], -1)
 
     imsave(osp.join(output_dir, img_name), img, check_contrast=False)
