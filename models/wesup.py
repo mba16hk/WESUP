@@ -500,7 +500,7 @@ class WESUPTrainer(BaseTrainer):
         elif self.kwargs.get('sp_seg') =='fz':
             
             segments = felzenszwalb(img.squeeze().cpu().numpy().transpose(1, 2, 0), 
-            scale=150, sigma=0.8, min_size=40)
+            scale=120, sigma=0.8, min_size=30)
 
         elif self.kwargs.get('sp_seg') =='q':
 
