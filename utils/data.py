@@ -389,6 +389,8 @@ class PointSupervisionDataset(SegmentationDataset):
 
         point_mask = np.zeros((self.n_classes, *img.shape[:2]), dtype='uint8')
         for x, y, class_ in points:
+            if class_ == self.n_classes:
+                    class_ = class_ - 1
             cv2.circle(point_mask[class_], (x, y), self.radius, 1, -1)
 
         if point_mask is not None:
