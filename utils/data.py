@@ -390,7 +390,7 @@ class PointSupervisionDataset(SegmentationDataset):
         point_mask = np.zeros((self.n_classes, *img.shape[:2]), dtype='uint8')
         for x, y, class_ in points:
             if class_ == self.n_classes:
-                    class_ = class_ - 1
+                class_ = class_ - 1
             cv2.circle(point_mask[class_], (x, y), self.radius, 1, -1)
 
         if point_mask is not None:
@@ -530,12 +530,16 @@ class Digest2019PointDataset(SegmentationDataset):
             unique_points.append(vector_tuple[2])
         unique_points = np.unique(unique_points)
 
+        unique_new = []
         if self.n_classes < len(np.unique(unique_points)):
             for i in range(len(points)):
-              vector_tuple = list(points[i])
-              if vector_tuple[2] > self.n_classes:
-                  vector_tuple[2] = 0
-              points [i] = tuple(vector_tuple)
+                vector_tuple = list(points[i])
+                if vector_tuple[2] > (self.n_classes-1):
+                    vector_tuple[2] = 0
+                unique_new.append(vector_tuple[2])
+                points [i] = tuple(vector_tuple)
+
+        unique_new = np.unique(unique_new)
 
         img, pixel_mask = self._convert_image_and_mask_to_tensor(
             img, pixel_mask)
@@ -546,9 +550,8 @@ class Digest2019PointDataset(SegmentationDataset):
             point_mask = np.zeros(
                 (self.n_classes, *img.shape[-2:]), dtype='uint8')
             for x, y, class_ in points:
-                #might be problematic 
-                if class_ == self.n_classes:
-                    class_ = class_ - 1
+                if class_ > self.n_classes-1:
+                    class_ = 0
                 cv2.circle(point_mask[class_], (x, y), self.radius, 1, -1)
 
             if point_mask is not None:
