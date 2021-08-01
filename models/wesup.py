@@ -57,8 +57,9 @@ def _preprocess_superpixels(segments, mask=None, epsilon=1e-7):
 
     # stacking normalized superpixel segment maps
     sp_maps = segments == sp_idx_list[:, None, None]
-    sp_maps = sp_maps.squeeze().float()
-
+    a ,b, c = sp_maps.shape
+    if a > 1:
+        sp_maps = sp_maps.squeeze().float()
     # make sure each superpixel map sums to one
     sp_maps = sp_maps / sp_maps.sum(dim=(1, 2), keepdim=True)
     return sp_maps, sp_labels
