@@ -51,9 +51,6 @@ def calculate_weights(dataset_path, filetype) :
     #Equations taken from Crowdsourcing dataset supplementary material
     ratio= [x / imgsize for x in n]
     weights=[1-x for x in ratio]
-    if "amgad" in base(dirname(dirname(args.dataset_path))) or "Amgad" in base(dirname(dirname(args.dataset_path))):
-        print("Amgad dataset sets class 0 to weight 0.")
-        weights[0]=0 #Amgad dataset says that the 0 is not ROI data, therefore set class 0 to 0.
 
     np.savetxt(f"weights-{str(base(dirname(dirname(args.dataset_path))))}.csv", weights, delimiter=',') 
     
