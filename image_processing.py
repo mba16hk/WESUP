@@ -9,6 +9,7 @@ import argparse
 import sys
 import os
 import glob
+import math
 import image_slicer
 import shutil
 import pandas as pd
@@ -32,14 +33,14 @@ def build_cli_parser():
      help='Path to output croppped dataset')
     parser.add_argument('-r','--reduce', choices=['t', 'c', 's'],
      help='Type t for tiling, c for cropping, and s for rescaling.')
-    parser.add_argument('-T','--target_pixels', type=int, default=1800,
+    parser.add_argument('-T','--target_pixels', type=int, default=200000000,
      help='The maximum height or width of the image above which image rescaling happens.')
-    parser.add_argument('-N','--tile_number', type=int , default = 'None',
+    parser.add_argument('-N','--tile_number', type=float , default = 'None',
      help='If tiling, the image will be chopped into NxN tiles. If cropping, the image will be chopped into NxN pixels. If rescaling, N would be any value greater than 0 and less than or equal to 1.')
     return parser
 
 def rescale_images(orig_path, dst_path, filetype, N) :
-    output_path=dst_path
+    output_path = dst_path
     if not os.path.exists(output_path):
         os.mkdir(output_path)
     
@@ -59,18 +60,18 @@ def rescale_images(orig_path, dst_path, filetype, N) :
                 x='*.'+filetype
                 for file in glob.glob(j(original_path,path,x)):
                     im= io.imread(file)
-                    image_rescaled = rescale(im, N, anti_aliasing=False, 
-                                                 mode='constant', multichannel= True)
+                    image_rescaled = resize(im, (im.shape[0]//N, im.shape[1]//N), anti_aliasing=True, 
+                                                 mode='constant')
                     filename='resc'+os.path.basename(file)
-                    destination=j(output_path,directory, path, filename)
+                    destination=j(dst_sub_dir, filename)
                     io.imsave(destination, image_rescaled)
             else:
-                for file in glob.glob(j(original_path,path,x)):
+                for file in glob.glob(j(original_path,path)):
                     im= io.imread(file)
-                    image_rescaled = rescale(im, N, anti_aliasing=False, 
-                                                 mode='constant', multichannel= True)
+                    image_rescaled = resize(im, (im.shape[0]//N, im.shape[1]//N), anti_aliasing=True, 
+                                                 mode='constant')
                     filename='resc'+os.path.basename(file)
-                    destination=j(output_path,directory, path, filename)
+                    destination=j(dst_main_dir, filename)
                     io.imsave(destination, image_rescaled)
                         
 #rescales an image in a separate directory
@@ -103,11 +104,21 @@ def scale_and_tile(target_pixels,file, dst_main_dir,filetype, N):
         
     if N==0 :
         im=Image.open(rs_im)
-        w, h = im.size   
-        Nw=round(w/650)
-        Nh=round(h/650)
-        tiles=image_slicer.slice(rs_im,row=Nh,
+        w, h = im.size
+        if w > 1300 or h > 1300:
+            if w > 1300:
+                Nw=math.ceil(w/1000)
+            else:
+                Nw = 1
+            if h > 1300:
+                Nh=math.ceil(h/1000)
+            else:
+                Nh = 1
+            tiles=image_slicer.slice(rs_im,row=Nh,
                                      col=Nw,save= False)
+        else: 
+            tiles = rs_im
+        
     else :
         tiles=image_slicer.slice(rs_im,row=N,
                                      col=N,save= False)
@@ -195,7 +206,7 @@ def tile_images(orig_path, dst_path, filetype, N, target_pixels) :
             os.mkdir(dst_main_dir)
         
         if os.path.isdir(j(orig_path,directory)) :
-            original_path=j(orig_path,directory)
+            original_path = j(orig_path,directory)
             
         for path in os.listdir(original_path) :
             if os.path.isdir(j(original_path,path)):
@@ -207,9 +218,15 @@ def tile_images(orig_path, dst_path, filetype, N, target_pixels) :
                     tiles=scale_and_tile(target_pixels,file, dst_sub_dir, filetype, N)
                     filename=split(os.path.basename(file))
                     output_prefix="sl_" + filename[0]
-                    destination=j(dst_sub_dir)
-                    image_slicer.save_tiles(tiles, directory=destination, 
+                    destination= dst_sub_dir
+                    if type(tiles) == tuple:
+                        image_slicer.save_tiles(tiles, directory=destination, 
                                             prefix=output_prefix, format=filetype)
+                    else:
+                        destination=j(dst_sub_dir, output_prefix+'.'+filetype)
+                        print(destination)
+                        img=Image.open(file)  
+                        img.save(destination)
                     if os.path.exists(j(dst_sub_dir,"rescaled_images")):
                         shutil.rmtree(j(dst_sub_dir,"rescaled_images"), ignore_errors=True)
             else:
@@ -217,9 +234,15 @@ def tile_images(orig_path, dst_path, filetype, N, target_pixels) :
                     tiles=scale_and_tile(target_pixels,file, dst_main_dir, filetype, N)
                     filename=split(os.path.basename(file))
                     output_prefix="sl_" + filename[0]
-                    destination=j(dst_main_dir)
-                    image_slicer.save_tiles(tiles, directory=destination, 
-                                            prefix=output_prefix, format=filetype) 
+                    destination= dst_main_dir
+                    if type(tiles) == tuple:
+                        image_slicer.save_tiles(tiles, directory=destination, 
+                                            prefix=output_prefix, format=filetype)
+                    else:
+                        destination=j(dst_main_dir, output_prefix+'.'+filetype)
+                        print(destination)
+                        img=Image.open(file)  
+                        img.save(destination)
                 
                 if os.path.exists(j(dst_main_dir,"rescaled_images")):
                     shutil.rmtree(j(dst_main_dir,"rescaled_images"), ignore_errors=True)
