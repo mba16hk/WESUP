@@ -136,7 +136,7 @@ def dice(S, G, n_classes=2, epsilon=1e-7):
                 S_labels = (S == i)
                 G_labels = (G == i)
                 intersection_lab = np.logical_and(S_labels.cpu(), G_labels.cpu()).sum().item()
-                union = G_labels.sum().item() + S_labels.sum().item() + epsilon
+                union = (G_labels.sum().item() + S_labels.sum().item() - intersection_lab) + epsilon
                 alpha = 1/(union**2)
                 numerator += (alpha*intersection_lab)
                 denominator += (alpha*union)
@@ -158,7 +158,7 @@ def dice(S, G, n_classes=2, epsilon=1e-7):
             S_labels = (S == i)
             G_labels = (G == i)
             intersection_lab = np.logical_and(S_labels.cpu(), G_labels.cpu()).sum().item()
-            union = G_labels.sum().item() + S_labels.sum().item() + epsilon
+            union = (G_labels.sum().item() + S_labels.sum().item() - intersection_lab) + epsilon
             alpha = 1/(union**2)
             numerator += (alpha*intersection_lab)
             denominator += (alpha*union)
@@ -326,29 +326,26 @@ def iou(S, G, epsilon=1e-7, n_classes=2):
     """
 
     if torch.is_tensor(S) and torch.is_tensor(G):
-        intersection=[0]*n_classes
-        union=[0]*n_classes
+        iou = 0
         for i in range(n_classes):
-            # Find occurrences of each class
             S_labels = (S == i)
             G_labels = (G == i)
-
-            # Find the intersection between the predicted and the actual
             intersect = np.logical_and(S_labels.cpu(), G_labels.cpu()).sum() 
-            intersection[i] = intersect.item() #converts to integer
-            union_of_data = ((2*(S_labels.sum() + G_labels.sum())) - intersection[i])
-            union[i] = union_of_data.item() + epsilon
-        iou = np.array(intersection)/np.array(union)
+            intersection = intersect.item() #converts to integer
+            union = ((((S_labels.sum() + G_labels.sum())) - intersection)).item() + epsilon
+            iou += intersection/union
+        iou_mean = (1/n_classes) * iou
+        return iou_mean
 
     else:
-        intersection=[0]*n_classes
-        union=[0]*n_classes
+        iou = 0
         for i in range(n_classes):
             S_labels = (S == i)
             G_labels = (G == i)
             intersect = np.logical_and(S_labels.cpu(), G_labels.cpu()).sum() 
-            intersection[i] = intersect.item() #converts to integer
-            union[i] = ((2*(S_labels.sum() + G_labels.sum())) - intersection[i]) + epsilon
-        iou = np.array(intersection)/np.array(union)
+            intersection = intersect.item() #converts to integer
+            union = ((((S_labels.sum() + G_labels.sum()))).item() - intersection) + epsilon
+            iou += intersection/union
+        iou_mean = (1/n_classes) * iou
     
-    return iou.mean()
+        return iou_mean
