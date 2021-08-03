@@ -132,15 +132,17 @@ def dice(S, G, n_classes=2, epsilon=1e-7):
             block, row, col = G.shape
             numerator = 0
             denominator = 0
-            for i in range(n_classes):
+            for i in range(len(G.unique())):
                 S_labels = (S == i)
                 G_labels = (G == i)
+                #print(i, 's_labs', S_labels.sum(), 'g_labs', G_labels.sum())
                 intersection_lab = np.logical_and(S_labels.cpu(), G_labels.cpu()).sum().item()
                 union = (G_labels.sum().item() + S_labels.sum().item() - intersection_lab) + epsilon
                 alpha = 1/(union**2)
                 numerator += (alpha*intersection_lab)
                 denominator += (alpha*union)
             GDL = numerator/denominator
+            #print('GDL', GDL)
             return GDL
 
         return dice_score.mean().item()
@@ -154,15 +156,17 @@ def dice(S, G, n_classes=2, epsilon=1e-7):
         block, row, col = G.shape
         numerator = 0
         denominator = 0
-        for i in range(n_classes):
+        for i in range(np.unique(G)):
             S_labels = (S == i)
             G_labels = (G == i)
+            #print(i,'s_labs', S_labels.sum(), 'g_labs', G_labels.sum())
             intersection_lab = np.logical_and(S_labels.cpu(), G_labels.cpu()).sum().item()
             union = (G_labels.sum().item() + S_labels.sum().item() - intersection_lab) + epsilon
             alpha = 1/(union**2)
             numerator += (alpha*intersection_lab)
             denominator += (alpha*union)
         GDL = numerator/denominator
+        #print('GDL', GDL)
         return GDL
 
     return dice_score.mean()
