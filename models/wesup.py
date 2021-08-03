@@ -452,13 +452,16 @@ class WESUPTrainer(BaseTrainer):
                 return Digest2019PointDataset(root_dir, proportion=proportion, 
                                               multiscale_range=self.kwargs.get('multiscale_range'),
                                               n_classes=self.kwargs.get('n_classes'),
-                                              rescale_factor=self.kwargs.get('rescale_factor'))
+                                              rescale_factor=self.kwargs.get('rescale_factor'),
+                                              shift_classes = self.kwargs.get('shift_classes'))
             return SegmentationDataset(root_dir, proportion=proportion,
                                        multiscale_range=self.kwargs.get('multiscale_range'),
                                        rescale_factor=self.kwargs.get('rescale_factor'),
-                                       n_classes=self.kwargs.get('n_classes'))
+                                       n_classes=self.kwargs.get('n_classes'),
+                                       shift_classes = self.kwargs.get('shift_classes'))
         return SegmentationDataset(root_dir, rescale_factor=self.kwargs.get('rescale_factor'), train=False,
-                                   n_classes=self.kwargs.get('n_classes'))
+                                   n_classes=self.kwargs.get('n_classes'),
+                                   shift_classes = self.kwargs.get('shift_classes'))
 
     def get_default_optimizer(self):
         optimizer = torch.optim.SGD(
