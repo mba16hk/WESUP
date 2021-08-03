@@ -38,6 +38,8 @@ def build_cli_parser():
      help='Weight Decay. Any value between 0 and 1.')
     parser.add_argument('-D', default=32, type=int,
      help='The dim(0) output of the classifier. Values should be integers that are powers of 2.')
+    parser.add_argument('--shift_classes', default="F", choices=["T", "F"],
+     help='A flag that shifts the class label down by 1 for each class. used for the Amgad dataset with no 0 class.')
     parser.add_argument('-S', '--sp_segmentation', default="slic", choices=['slic', 'fz', 'q', 'w'],
      help='The type of superpixel segmentation algorithm to be used. This can be slic, fz for felzenszwalb, q for quickshift, or w for watershed.')
     parser.add_argument('-m', '--multiscale_range', default=None, type=float, nargs='+',
@@ -95,6 +97,6 @@ if __name__ == '__main__':
 
     print("Using", seg_method,"super-pixel segmentation.")
     fit(args.dataset_path, model= "wesup", class_weights=weights, n_classes=args.n_classes,
-     D=args.D, sp_seg=args.sp_segmentation, weight_decay = args.wd, epochs=args.epochs, 
+     D=args.D, sp_seg=args.sp_segmentation, weight_decay = args.wd, epochs=args.epochs, shift_classes = args.shift_classes,
      batch_size=args.batch, proportion=args.proportion, checkpoint=args.checkpoint, lr = args.lr,
      rescale_factor=args.rescale_factor, multiscale_range=args.multiscale_range, momentum=args.momentum)
