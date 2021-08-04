@@ -46,7 +46,7 @@ def _preprocess_superpixels(segments, mask=None, epsilon=1e-7):
         labeled_sps = (sp_labels.sum(dim=-1) > 0).nonzero().flatten()
         unlabeled_sps = (sp_labels.sum(dim=-1) == 0).nonzero().flatten()
         sp_idx_list = torch.cat([labeled_sps, unlabeled_sps])
-       
+        
         # quantize superpixel labels (e.g., from (0.7, 0.3) to (1.0, 0.0))
         sp_labels = sp_labels[labeled_sps]
         sp_labels = (sp_labels == sp_labels.max(

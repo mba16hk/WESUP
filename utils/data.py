@@ -40,7 +40,7 @@ class SegmentationDataset(Dataset):
     """
 
     def __init__(self, root_dir, mode=None, contour=False, target_size=None, rescale_factor=None,
-                 multiscale_range=None, train=True, proportion=1, n_classes=2, seed=0):
+                 multiscale_range=None, train=True, proportion=1, n_classes=2, seed=0, shift_classes = "F"):
         """Initialize a new SegmentationDataset.
 
         Args:
@@ -78,6 +78,7 @@ class SegmentationDataset(Dataset):
         self.train = train
         self.proportion = proportion
         self.n_classes = n_classes
+        self.shift_classes = shift_classes
         print('segdataset', self.n_classes)
         self.multiscale_range = multiscale_range
 
@@ -97,14 +98,17 @@ class SegmentationDataset(Dataset):
         if self.target_size is not None:
             target_height, target_width = self.target_size
         elif self.multiscale_range is not None:
+            #print("1")
             self.rescale_factor = np.random.uniform(*self.multiscale_range)
             target_height = int(np.ceil(self.rescale_factor * height))
             target_width = int(np.ceil(self.rescale_factor * width))
         elif self.rescale_factor is not None:
+            #print("2")
             #Scales down the height and width by the allocated rescale factor
             target_height = int(np.ceil(self.rescale_factor * height))
             target_width = int(np.ceil(self.rescale_factor * width))
         else:
+            #print("3")
             #Keep the heights and widths the same as the raw input image
             target_height, target_width = height, width
         img = resize_img(img, (target_height, target_width))
@@ -163,27 +167,14 @@ class SegmentationDataset(Dataset):
         if self.mask_paths is not None:
             mask = imread(str(self.mask_paths[idx]))
 
-            #Collapse all classes > the provided n_classes into 0 (testing purposes)
-            if len(np.unique(mask))>(self.n_classes-1):
-                mask[mask>(self.n_classes-1)]=0
+            #print("unique masks point before", np.unique(mask))
+            if self.shift_classes:
+                mask = mask - 1
 
-            #print("unique masks point", len(np.unique(mask)))
-            #Collapse all classes > 1 into a single label for testing purposes
-            
-            #if self.swap0:
-                #The background should be 0 and the ROI>0
-            # mask3=(mask==3)
-            # mask2=(mask==2)
-            # mask1=(mask==1)
-            
-            # mask[mask1]=0
-            # mask[mask2]=1
-            # mask[mask3]=2
+            #Collapse all classes >= the provided n_classes into 0 (testing purposes)
+            mask[mask>(self.n_classes-1)] = 0
 
-            # mask1=(mask==1)
-            # mask0=(mask==0)
-            # mask[mask0]=1
-            # mask[mask1]=0
+            #print("unique masks point after", np.unique(mask))
 
         img, mask = self._resize_image_and_mask(img, mask)
 
@@ -529,6 +520,18 @@ class Digest2019PointDataset(SegmentationDataset):
             vector_tuple = list(points[i])
             unique_points.append(vector_tuple[2])
         unique_points = np.unique(unique_points)
+
+        # Only for amgad dataset
+        unique_new = []
+        if self.n_classes == 20 and self.shift_classes == "T":
+            for i in range(len(points)):
+                vector_tuple = list(points[i])
+                shift_1 = vector_tuple[2] - 1
+                vector_tuple[2] = shift_1
+                unique_new.append(vector_tuple[2])
+                points [i] = tuple(vector_tuple)
+        unique_new = np.unique(unique_new)
+        #print(unique_new)
 
         unique_new = []
         if self.n_classes < len(np.unique(unique_points)):
