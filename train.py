@@ -5,8 +5,9 @@ Training module.
 import logging
 from shutil import rmtree
 
-from utils.metrics import accuracy, iou
-from utils.metrics import dice, hausdorff
+from utils.metrics import accuracy, iou, iou_class, dice, dice_class
+import numpy as np
+import random
 import argparse
 import csv
 import torch
@@ -38,13 +39,35 @@ def build_cli_parser():
      help='Weight Decay. Any value between 0 and 1.')
     parser.add_argument('-D', default=32, type=int,
      help='The dim(0) output of the classifier. Values should be integers that are powers of 2.')
-    parser.add_argument('--shift_classes', default="F", choices=["T", "F"],
-     help='A flag that shifts the class label down by 1 for each class. used for the Amgad dataset with no 0 class.')
+    parser.add_argument('--shift_classes', action="store_true",
+     help='A flag that shifts the class label down by 1 for each class. Used for the Amgad dataset with no 0 class.')
     parser.add_argument('-S', '--sp_segmentation', default="slic", choices=['slic', 'fz', 'q', 'w'],
      help='The type of superpixel segmentation algorithm to be used. This can be slic, fz for felzenszwalb, q for quickshift, or w for watershed.')
     parser.add_argument('-m', '--multiscale_range', default=None, type=float, nargs='+',
      help='multiscale_range, takes 2 numbers, where the first number passed is less than the second number. Both numbers can be any values between 0 and 1.')
     return parser
+
+def set_seed(s, reproducible=False):
+    "Set random seed for `random`, `torch`, and `numpy` (where available)"
+    try:
+        torch.manual_seed(s)
+    except NameError:
+        pass
+
+    try:
+        torch.cuda.manual_seed_all(s)
+    except NameError:
+        pass
+
+    try:
+        np.random.seed(s%(2**32-1))
+    except NameError:
+        pass
+
+    random.seed(s)
+    if reproducible:
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
 
 def read_class_weights(weights_file):
     results = []
@@ -67,7 +90,7 @@ def fit(dataset_path, model='wesup', **kwargs):
     try:
         if kwargs.get('n_classes')>2:
             #iou calculated for multiclass data
-            trainer.train(dataset_path, metrics=[accuracy, dice, iou], **kwargs)
+            trainer.train(dataset_path, metrics=[accuracy, dice, iou, iou_class, dice_class], **kwargs)
         else:
             #iou not calculated for binary data
             trainer.train(dataset_path, metrics=[accuracy, dice], **kwargs)
@@ -79,7 +102,7 @@ def fit(dataset_path, model='wesup', **kwargs):
 if __name__ == '__main__':
     parser = build_cli_parser()
     args = parser.parse_args()
-    
+    set_seed(3, reproducible=True)
     if args.class_weights is not None:
         weights=read_class_weights(args.class_weights)
        

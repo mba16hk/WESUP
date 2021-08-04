@@ -132,7 +132,7 @@ def dice(S, G, n_classes=2, epsilon=1e-7):
             block, row, col = G.shape
             numerator = 0
             denominator = 0
-            for i in range(len(G.unique())):
+            for i in G.unique():
                 S_labels = (S == i)
                 G_labels = (G == i)
                 #print(i, 's_labs', S_labels.sum(), 'g_labs', G_labels.sum())
@@ -156,7 +156,7 @@ def dice(S, G, n_classes=2, epsilon=1e-7):
         block, row, col = G.shape
         numerator = 0
         denominator = 0
-        for i in range(np.unique(G)):
+        for i in np.unique(G):
             S_labels = (S == i)
             G_labels = (G == i)
             #print(i,'s_labs', S_labels.sum(), 'g_labs', G_labels.sum())
@@ -353,3 +353,34 @@ def iou(S, G, epsilon=1e-7, n_classes=2):
         iou_mean = (1/n_classes) * iou
     
         return iou_mean
+
+def iou_class(S, G, epsilon=1e-7, n_classes=2):
+    if torch.is_tensor(S) and torch.is_tensor(G):
+        iou_per_class = []
+        for i in range(n_classes):
+            S_labels = (S == i)
+            G_labels = (G == i)
+            intersect = np.logical_and(S_labels.cpu(), G_labels.cpu()).sum() 
+            intersection = intersect.item() #converts to integer
+            union = ((((S_labels.sum() + G_labels.sum())) - intersection)).item() + epsilon
+            iou = intersection/union
+            iou_per_class.append(iou)
+        #print(iou_per_class)
+        return iou_per_class
+
+def dice_class(S, G, epsilon=1e-7, n_classes=2):
+    S = S.unsqueeze(0) if len(S.size()) == 2 else S
+    G = G.unsqueeze(0) if len(G.size()) == 2 else G
+    S, G = S.float(), G.float()
+    block, row, col = G.shape
+    GDL = []
+    for i in G.unique():
+        S_labels = (S == i)
+        G_labels = (G == i)
+        intersection_lab = np.logical_and(S_labels.cpu(), G_labels.cpu()).sum().item()
+        union = (G_labels.sum().item() + S_labels.sum().item() - intersection_lab) + epsilon
+        alpha = 1/(union**2)
+        numerator = (alpha*intersection_lab)
+        denominator = (alpha*union)
+        GDL.append(numerator/denominator)
+    return GDL
