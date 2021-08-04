@@ -105,13 +105,13 @@ def scale_and_tile(target_pixels,file, dst_main_dir,filetype, N):
     if N==0 :
         im=Image.open(rs_im)
         w, h = im.size
-        if w > 1300 or h > 1300:
-            if w > 1300:
-                Nw=math.ceil(w/1000)
+        if w > 400 or h > 400:
+            if w > 400:
+                Nw=math.ceil(w/400)
             else:
                 Nw = 1
-            if h > 1300:
-                Nh=math.ceil(h/1000)
+            if h > 400:
+                Nh=math.ceil(h/400)
             else:
                 Nh = 1
             tiles=image_slicer.slice(rs_im,row=Nh,

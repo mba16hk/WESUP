@@ -16,7 +16,7 @@ from joblib import Parallel, delayed
 
 def _sample_within_region(region_mask, class_label, num_samples=1):
 
-    xs, ys = np.where(region_mask)
+    xs, ys = np.where(region_mask) #finds the coordinates of the region of interest
 
     if num_samples == 1:
         x_center, y_center = int(xs.mean().round()), int(ys.mean().round())
