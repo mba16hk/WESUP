@@ -374,7 +374,7 @@ def dice_class(S, G, epsilon=1e-7, n_classes=2):
     S, G = S.float(), G.float()
     block, row, col = G.shape
     GDL = []
-    for i in G.unique():
+    for i in range(n_classes):
         S_labels = (S == i)
         G_labels = (G == i)
         intersection_lab = np.logical_and(S_labels.cpu(), G_labels.cpu()).sum().item()

@@ -240,7 +240,7 @@ class BaseTrainer(ABC):
                     self.logger.exception(ex)
 
             self.logger.info(f'Took {time.time() - start:.2f}s.')
-            self.logger.info(self.tracker.log())
+            self.logger.info(self.tracker.log(n_classes = self.kwargs.get('n_classes')))
             pbar.close()
 
     def post_epoch_hook(self, epoch):
@@ -319,7 +319,7 @@ class BaseTrainer(ABC):
             self.post_epoch_hook(epoch)
 
             # save metrics to csv file
-            self.tracker.save()
+            self.tracker.save(n_classes = self.kwargs.get('n_classes'))
 
             # save learning curves
             record.plot_learning_curves(self.tracker.save_path)

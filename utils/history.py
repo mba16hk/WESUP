@@ -42,18 +42,23 @@ class HistoryTracker:
             else:
                 self.history[k].append(np.mean(v))
                 reports.append('{} = {:.4f}'.format(k, np.mean(v)))
+        #print('reports', reports)
         return ', '.join(reports)
 
-    def log(self):
+    def log(self, n_classes):
         k_list=[]
         v_list=[]
         for k, v in sorted(self.history.items()):
-            k_list.append(k)
-            v_list.append(np.mean(v))
+            
             if k == "iou_class" or k == "dice_class":
-                for i in range(len(v)):
+                v_new = np.reshape(v, (-1, n_classes))
+                v_means = v_new.mean(0)
+                for i in range(len(v_means)):
                     k_list.append(k+str(i))
-                    v_list.append(v[i])
+                    v_list.append(v_means[i])
+            else:
+                k_list.append(k)
+                v_list.append(np.mean(v))
 
         #print("k", k_list, "v", v_list)
 
@@ -61,31 +66,44 @@ class HistoryTracker:
         for i in range(len(k_list)):
             metrics[k_list[i]] = v_list[i]
 
+        #print('metrics',metrics)
+
+        # metrics = {
+        #     k: (sum(v) / len(v) if v else 0)
+        #     for k, v in sorted(self.history.items())
+        #     if k.startswith('val_') != self.is_train
+        # }
+
         return ', '.join('average {} = {:.4f}'.format(name, value)
                          for name, value in metrics.items()).capitalize()
 
-    def save(self):
+    def save(self, n_classes):
         """Save averaged metrics in this epoch to csv file."""
 
         if self.save_path is None:
             raise RuntimeError(
                 'cannot save history without setting save_path.')
-        for k, _ in sorted(self.history.items()):
-            print("k", k, "_", _)
-
         k_list=[]
         v_list=[]
         for k, v in sorted(self.history.items()):
-            k_list.append(k)
-            v_list.append(np.mean(v))
+            #print("k",k,"v",v)
+            # k_list.append(k)
+            # v_list.append(np.mean(v))
+            #print("k_list",k_list,"v_list",v_list)
             if k == "iou_class" or k == "dice_class":
-                for i in range(len(v)):
+                v_new = np.reshape(v, (-1, n_classes))
+                v_means = v_new.mean(0)
+                for i in range(len(v_means)):
                     k_list.append(k+str(i))
-                    v_list.append(v[i])
+                    v_list.append(v_means[i])
+            else:
+                k_list.append(k)
+                v_list.append(np.mean(v))
 
-        keys =  k_list #[k for k, _ in sorted(self.history.items())]
-        #print(keys)
-        metrics = v_list #[sum(v) / len(v) for _, v in sorted(self.history.items())]
+        # print(v_list)
+        # print(k_list)
+        keys =  k_list  #[k for k, _ in sorted(self.history.items())] #k_list 
+        metrics =  v_list #[sum(v) / len(v) for _, v in sorted(self.history.items())] #v_list
         #print(metrics)
         if not os.path.exists(self.save_path):
             # create a new csv file
